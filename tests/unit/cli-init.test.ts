@@ -55,9 +55,12 @@ describe('init — CLAUDE.md append (spec section 10)', () => {
     expect(content).toContain('mastishk inject');
   });
 
-  it('does not append if CLAUDE.md does not exist', async () => {
+  it('creates CLAUDE.md with Mastishk section when file does not exist', async () => {
     await initCommand({ cwd: tmpDir });
-    expect(await exists(join(tmpDir, 'CLAUDE.md'))).toBe(false);
+    // New behaviour: init creates CLAUDE.md even if absent (SPEC-GAP section 13)
+    const content = await readFile(join(tmpDir, 'CLAUDE.md'), 'utf-8');
+    expect(content).toContain('## Mastishk memory');
+    expect(content).toContain('mastishk inject');
   });
 
   it('does not append duplicate section on second init', async () => {

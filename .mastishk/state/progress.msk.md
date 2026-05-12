@@ -20,6 +20,22 @@ Phase 5 — @mastishk/cli: scan command — COMPLETE.
 Phase 6 — tests/compliance/: full compliance suite — COMPLETE.
 Phase 7 — npm publish prep + arXiv paper + mastishk.dev — COMPLETE (human publish actions pending).
 
+### 2026-05-12T04:00:00.000Z — claude-code
+
+Phase 3 CLI enhanced — enhanced init, instruct command, automated git hook pipeline — COMPLETE.
+Files created/modified:
+- src/packages/cli/src/commands/init.ts — interactive goal prompt, node writing, git hook install, richer CLAUDE.md
+- src/packages/cli/src/commands/instruct.ts — agent-specific briefing (claude-code, cursor, windsurf, api)
+- src/packages/cli/src/commands/hook.ts — git post-commit hook runner (auto-updates state memory)
+- src/packages/cli/src/bin.ts — registered mastishk instruct and mastishk hook commands
+- src/packages/mcp/src/bin.ts — added --memory-dir flag support
+- src/packages/cli/package.json — added @inquirer/prompts dependency
+- tests/unit/init.test.ts — 17 new tests for enhanced init (prompts, nodes, hook, CLAUDE.md)
+- tests/unit/instruct.test.ts — 9 new tests for instruct command (all agents, memory summary)
+- tests/unit/cli-init.test.ts — updated CLAUDE.md creation test for new behavior
+SPEC-GAPs logged: interactive prompt (section 11), git hook (section 12), CLAUDE.md briefing format (section 13)
+Total tests: 380 passing (18 test files).
+
 ### 2026-05-12T03:00:00.000Z — claude-code
 
 Phase 7 complete (preparatory work). All packages bumped to 0.1.0, built clean.

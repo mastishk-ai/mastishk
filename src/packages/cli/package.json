@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@mastishk/core": "0.1.0",
+    "@inquirer/prompts": "^7.0.0",
     "commander": "^12.1.0"
   },
   "engines": {

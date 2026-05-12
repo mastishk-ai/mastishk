@@ -143,6 +143,7 @@ npx @mastishk/cli mcp               # start MCP server
 | 1 | `@mastishk/core` — schema, validate, read, write | ✅ |
 | 2 | `@mastishk/core` — graph, traverse, inject | ✅ |
 | 3 | `@mastishk/cli` — init, inject, update, log, status | ✅ |
+| 3b | `@mastishk/cli` — enhanced init (prompts, nodes, hook), instruct, hook commands | ✅ |
 | 4 | `@mastishk/mcp` — MCP server with all tools | ✅ |
 | 5 | `@mastishk/cli` — scan command | ✅ |
 | 6 | `tests/compliance/` — full compliance suite | ✅ |

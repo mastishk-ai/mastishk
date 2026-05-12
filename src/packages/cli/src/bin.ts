@@ -7,6 +7,9 @@ import { logCommand } from './commands/log-cmd.js';
 import { statusCommand } from './commands/status.js';
 import { checkpointCommand } from './commands/checkpoint.js';
 import { scanCommand } from './commands/scan.js';
+import { instructCommand } from './commands/instruct.js';
+import type { AgentName } from './commands/instruct.js';
+import { hookCommand } from './commands/hook.js';
 
 program
   .name('mastishk')
@@ -73,6 +76,24 @@ program
   .option('--yes', 'auto-accept all inferred nodes without prompting')
   .action(async (opts) => {
     await scanCommand({ autoConfirm: opts.yes ? 'yes' : undefined }).catch(die);
+  });
+
+// SPEC-GAP: instruct command not in spec — proposed as section 11
+program
+  .command('instruct')
+  .description('Generate agent-specific briefing and write agent config files.')
+  .requiredOption('--agent <name>', 'agent to configure (claude-code|cursor|windsurf|api)')
+  .action(async (opts) => {
+    await instructCommand({ agent: opts.agent as AgentName }).catch(die);
+  });
+
+// SPEC-GAP: hook command not in spec — proposed as section 12
+// Runs automatically via post-commit git hook installed by mastishk init
+program
+  .command('hook')
+  .description('Post-commit git hook: auto-update state memory from commit message.')
+  .action(async () => {
+    await hookCommand().catch(die);
   });
 
 function die(err: unknown): never {

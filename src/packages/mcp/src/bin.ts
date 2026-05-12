@@ -3,10 +3,15 @@ import { join } from 'node:path';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createMastishkServer } from './server.js';
 
-// Resolve .mastishk/ from MASTISHK_DIR env var or cwd
-const mastishkDir = process.env['MASTISHK_DIR']
-  ? process.env['MASTISHK_DIR']
-  : join(process.cwd(), '.mastishk');
+// Resolve .mastishk/ from --memory-dir flag, MASTISHK_DIR env var, or cwd
+// SPEC-GAP: --memory-dir CLI flag not in spec section 9 — needed for MCP config files
+function resolveMemoryDir(): string {
+  const idx = process.argv.indexOf('--memory-dir');
+  if (idx !== -1 && process.argv[idx + 1]) return process.argv[idx + 1] as string;
+  if (process.env['MASTISHK_DIR']) return process.env['MASTISHK_DIR'];
+  return join(process.cwd(), '.mastishk');
+}
+const mastishkDir = resolveMemoryDir();
 
 const server = createMastishkServer(mastishkDir);
 const transport = new StdioServerTransport();
