@@ -1,0 +1,24 @@
+{
+  "name": "@mastishk/core",
+  "version": "0.0.1",
+  "description": "Core schema, validation, read, write, and graph for the Mastishk protocol.",
+  "license": "Apache-2.0",
+  "author": "Mastishk Protocol Contributors",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "zod": "^3.23.8"
+  }
+}
