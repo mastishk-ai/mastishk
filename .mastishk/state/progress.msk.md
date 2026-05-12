@@ -13,7 +13,7 @@ contradictions: []
 tags: [phase-1, core, schema, validate]
 ---
 
-Phase 1 — @mastishk/core: schema and validate — IN PROGRESS.
+Phase 1 — @mastishk/core: schema, validate, read, write — IN PROGRESS.
 
 ### 2026-05-12T00:00:00Z — claude-code
 
