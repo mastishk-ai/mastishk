@@ -1,0 +1,11 @@
+{
+  "name": "mastishk",
+  "version": "0.0.1",
+  "description": "One brain for every agent on your project.",
+  "license": "Apache-2.0",
+  "author": "Mastishk Protocol Contributors",
+  "private": true,
+  "workspaces": [
+    "src/packages/*"
+  ]
+}
