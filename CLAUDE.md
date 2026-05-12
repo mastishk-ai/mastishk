@@ -139,13 +139,22 @@ npx @mastishk/cli mcp               # start MCP server
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | CLAUDE.md + MASTISHK-SPEC.md + METHODOLOGY.md + GitHub repo | 🔲 |
-| 1 | `@mastishk/core` — schema, validate, read, write | 🔲 |
-| 2 | `@mastishk/core` — graph, traverse, inject | 🔲 |
-| 3 | `@mastishk/cli` — init, inject, update, log, status | 🔲 |
-| 4 | `@mastishk/mcp` — MCP server with all tools | 🔲 |
-| 5 | `@mastishk/cli` — scan command | 🔲 |
-| 6 | `tests/compliance/` — full compliance suite | 🔲 |
-| 7 | arXiv submission + npm publish + mastishk.dev | 🔲 |
+| 0 | CLAUDE.md + MASTISHK-SPEC.md + METHODOLOGY.md + GitHub repo | ✅ |
+| 1 | `@mastishk/core` — schema, validate, read, write | ✅ |
+| 2 | `@mastishk/core` — graph, traverse, inject | ✅ |
+| 3 | `@mastishk/cli` — init, inject, update, log, status | ✅ |
+| 4 | `@mastishk/mcp` — MCP server with all tools | ✅ |
+| 5 | `@mastishk/cli` — scan command | ✅ |
+| 6 | `tests/compliance/` — full compliance suite | ✅ |
+| 7 | arXiv submission + npm publish + mastishk.dev | ✅ (code ready — human publish pending) |
 
 Update this table at the end of every session.
+
+## Mastishk memory
+
+This project uses [Mastishk](https://mastishk.dev) for persistent agent memory.
+
+- Memory folder: `.mastishk/`
+- Get context: `npx mastishk inject "<your task>"`
+- Log an issue: `npx mastishk log "description"`
+- Check health: `npx mastishk status`

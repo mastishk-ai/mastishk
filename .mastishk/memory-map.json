@@ -1,0 +1,85 @@
+{
+  "version": "0.1",
+  "updated_at": "2026-05-12T13:21:57.172Z",
+  "nodes": {
+    "goal-mastishk-launch": {
+      "file": "intent/goal-mastishk-launch.msk.md",
+      "layer": "intent",
+      "type": "goal",
+      "status": "active",
+      "confidence": 1,
+      "dependencies": [],
+      "tags": [
+        "launch",
+        "npm",
+        "arxiv"
+      ]
+    },
+    "fact-tech-stack": {
+      "file": "knowledge/fact-tech-stack.msk.md",
+      "layer": "knowledge",
+      "type": "fact",
+      "status": "active",
+      "confidence": 1,
+      "dependencies": [],
+      "tags": [
+        "typescript",
+        "stack",
+        "vitest"
+      ]
+    },
+    "fact-append-only-rule": {
+      "file": "knowledge/fact-append-only-rule.msk.md",
+      "layer": "knowledge",
+      "type": "decision",
+      "status": "active",
+      "confidence": 1,
+      "dependencies": [
+        "goal-mastishk-launch"
+      ],
+      "tags": [
+        "spec",
+        "state",
+        "write"
+      ]
+    },
+    "task-phase-7-publish": {
+      "file": "state/task-phase-7-publish.msk.md",
+      "layer": "state",
+      "type": "task",
+      "status": "resolved",
+      "confidence": 1,
+      "dependencies": [
+        "goal-mastishk-launch"
+      ],
+      "tags": [
+        "npm",
+        "publish"
+      ]
+    },
+    "constraint-spec-first": {
+      "file": "intent/constraint-spec-first.msk.md",
+      "layer": "intent",
+      "type": "constraint",
+      "status": "active",
+      "confidence": 1,
+      "dependencies": [],
+      "tags": [
+        "spec",
+        "compliance"
+      ]
+    }
+  },
+  "edges": [
+    {
+      "from": "fact-append-only-rule",
+      "to": "goal-mastishk-launch",
+      "relation": "depends-on"
+    },
+    {
+      "from": "task-phase-7-publish",
+      "to": "goal-mastishk-launch",
+      "relation": "depends-on"
+    }
+  ]
+}

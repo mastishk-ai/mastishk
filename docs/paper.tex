@@ -1,0 +1,350 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{enumitem}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!8},
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{orange!80!black}
+}
+
+\title{\textbf{Mastishk: An Open Protocol for Structured, Persistent,\\
+Filesystem-Native Memory in AI Coding Agents}}
+
+\author{
+  Mastishk Protocol Contributors\\
+  \texttt{github.com/mastishk-ai/mastishk}\\
+  \texttt{mastishk.dev}
+}
+
+\date{May 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We present Mastishk, an open protocol and reference implementation for persistent, structured memory in AI coding agents. Current AI coding agents---Claude Code, Cursor, GitHub Copilot, and GPT-based tools---are stateless by default. Each session begins with no knowledge of prior decisions, architecture choices, errors, or goals. Existing workarounds (context files, vector retrieval, proprietary memory layers) fail to scale, lack causal structure, and do not support multi-agent collaboration. Mastishk defines a three-layer memory architecture stored as markdown files with YAML frontmatter, organised as a directed acyclic graph, and versioned through git. A \texttt{mastishk inject} operation traverses the dependency graph from task-matched nodes rather than relying on vector similarity, preserving causal relationships. Any implementation that passes the compliance suite is Mastishk-compliant, enabling interoperability across agents, tools, and programming languages. We release the protocol specification, reference TypeScript implementation, and compliance test suite as prior art under Apache 2.0.
+\end{abstract}
+
+\section{Introduction}
+
+AI coding agents have become primary collaborators in software development. A developer working with Claude Code, Cursor, or a GPT-based assistant delegates significant cognitive work to the agent: code generation, architecture decisions, debugging, and refactoring. The agents are capable. The infrastructure around them is not.
+
+Every session starts cold. The agent has no memory of the codebase decisions made last Tuesday, the architecture constraint added last month, or the three bugs that were logged and resolved last week. Developers compensate by maintaining context files (\texttt{CLAUDE.md}, \texttt{RULES.md}, system prompts), but these files go stale, hit token limits, and do not scale with project complexity.
+
+Three categories of workaround exist, and all fail in predictable ways:
+
+\paragraph{Flat context injection.} A manually maintained text file is prepended to every session. This degrades attention as the file grows~\cite{liu2023lost}, goes stale because no agent reliably updates it, and hits token limits on large projects.
+
+\paragraph{Vector RAG retrieval.} Memory is embedded and retrieved by semantic similarity. This optimises for proximity in embedding space rather than causal relevance. A goal node and a dependent task may have low cosine similarity but a critical dependency relationship that RAG cannot reconstruct~\cite{edge2024local}.
+
+\paragraph{Proprietary memory layers.} Services such as Mem0~\cite{mem0}, MemGPT/Letta~\cite{packer2023memgpt}, and LangMem store memory in vendor-specific infrastructure. Memory is inaccessible to agents from other vendors, not human-inspectable, and cannot be versioned with the project.
+
+We propose Mastishk as a solution to all three failure modes. Mastishk is:
+
+\begin{itemize}
+  \item \textbf{Filesystem-native} --- memory is stored as markdown files, versioned by git, readable by humans and all agents without special tooling.
+  \item \textbf{Causally structured} --- context injection traverses a dependency graph, not an embedding index.
+  \item \textbf{Multi-agent by design} --- the memory folder belongs to the project; any agent reads and writes the same folder.
+  \item \textbf{Protocol-first} --- Mastishk defines a specification and compliance suite. Any implementation in any language that passes the compliance tests is Mastishk-compliant.
+\end{itemize}
+
+This paper describes the protocol design (Section~\ref{sec:protocol}), the six methodology claims (Section~\ref{sec:claims}), the reference implementation (Section~\ref{sec:implementation}), a comparison with prior work (Section~\ref{sec:related}), and directions for empirical validation (Section~\ref{sec:hypotheses}).
+
+\section{Protocol Design}
+\label{sec:protocol}
+
+\subsection{Memory structure}
+
+Every project using Mastishk contains a \texttt{.mastishk/} folder:
+
+\begin{lstlisting}
+.mastishk/
+  intent/         <- goals and constraints
+  state/          <- tasks, progress, blockers
+  knowledge/      <- decisions, architecture, stack
+  issues/         <- errors, bugs, blockers
+  agents.json     <- registered agents
+  memory-map.json <- DAG index
+\end{lstlisting}
+
+\subsection{The node format}
+
+Every unit of memory is a \texttt{.msk.md} file --- markdown with YAML frontmatter. A node looks like:
+
+\begin{lstlisting}[language=yaml]
+---
+id: goal-launch-v1
+type: goal
+layer: intent
+status: active
+confidence: 1.0
+created_by: human
+created_at: 2026-05-12T00:00:00Z
+last_updated_by: claude-code
+last_updated_at: 2026-05-12T10:30:00Z
+dependencies: []
+contradictions: []
+tags: [launch, npm, v1]
+---
+
+Ship @mastishk/cli to npm before June 2026.
+Target: 100 GitHub stars within 30 days.
+\end{lstlisting}
+
+Required fields include: \texttt{id} (kebab-case, unique), \texttt{type} (goal / task / decision / constraint / issue / fact), \texttt{layer}, \texttt{status}, \texttt{confidence} (0.0--1.0), creator fields, timestamps, \texttt{dependencies}, and \texttt{contradictions}. Optional fields include \texttt{tags}, \texttt{scanned}, \texttt{verified}, and \texttt{expires\_at}.
+
+\subsection{Layer semantics}
+
+The three primary layers have distinct update rules:
+
+\begin{description}
+  \item[\texttt{intent/}] Long-term goals and constraints. Changes rarely. Agents must not modify without human confirmation.
+  \item[\texttt{state/}] Current tasks, progress, blockers. Changes every session. Writes are \emph{append-only}: new content is appended with a timestamp header, existing content is never overwritten.
+  \item[\texttt{knowledge/}] Architecture decisions, technical facts. Grows over time. Writes replace the body content but preserve frontmatter.
+\end{description}
+
+The \texttt{issues/} layer is a dedicated log: every issue is append-only (never deleted), only resolved via \texttt{status: resolved}.
+
+\subsection{The memory graph}
+
+\texttt{memory-map.json} is the DAG index of all nodes:
+
+\begin{lstlisting}[language=json]
+{
+  "version": "0.1",
+  "updated_at": "2026-05-12T10:30:00Z",
+  "nodes": {
+    "goal-launch-v1": {
+      "file": "intent/goal-launch-v1.msk.md",
+      "layer": "intent", "type": "goal",
+      "status": "active", "confidence": 1.0,
+      "dependencies": [], "tags": ["launch"]
+    },
+    "task-write-spec": {
+      "file": "state/task-write-spec.msk.md",
+      "layer": "state", "type": "task",
+      "status": "active", "confidence": 0.8,
+      "dependencies": ["goal-launch-v1"]
+    }
+  },
+  "edges": [
+    { "from": "task-write-spec", "to": "goal-launch-v1",
+      "relation": "depends-on" }
+  ]
+}
+\end{lstlisting}
+
+A compliant implementation must enforce: (1) no cycles, (2) no dangling references, (3) unique IDs. Violations raise typed errors.
+
+\subsection{The inject algorithm}
+
+\texttt{inject(task)} is the primary interface between Mastishk and an agent. It accepts a natural language task description and returns a formatted context string:
+
+\begin{enumerate}
+  \item Tokenise the task string and match against node IDs, tags, and body content
+  \item Select seed nodes from matches, ranked by confidence descending
+  \item Traverse the graph from seeds at depth 2
+  \item Filter to \texttt{status: active} nodes with \texttt{confidence} $\geq$ 0.5
+  \item Sort: \texttt{intent} first, then \texttt{state}, then \texttt{knowledge}
+  \item Format output per section 6.3 of the spec
+  \item Enforce a 2000-token budget, dropping lowest-confidence nodes first
+\end{enumerate}
+
+Output format:
+
+\begin{lstlisting}
+## Mastishk context -- build JWT authentication
+Generated: 2026-05-12T10:30:00Z
+
+### Goals
+**goal-launch-v1** [1.0] -- Ship @mastishk/cli to npm before June 2026.
+
+### Current state
+**task-write-spec** [0.8] -- Write the protocol spec.
+
+### Knowledge
+**fact-stack-choice** [0.9] -- Using TypeScript with strict mode.
+Full stack: TypeScript 5.4, Node 20, Zod 3.23.
+
+### Open issues
+\end{lstlisting}
+
+A key property: if a node has \texttt{confidence} $\geq$ 0.9, its full body is included. Otherwise, only the first sentence is shown. This incentivises high-confidence, concise node bodies for token efficiency.
+
+\subsection{The write-back contract}
+
+Any agent writing to Mastishk memory must:
+
+\begin{enumerate}
+  \item Provide its agent ID in \texttt{last\_updated\_by}
+  \item Update \texttt{last\_updated\_at} to the current timestamp
+  \item Pass the new node through the Referee before committing
+\end{enumerate}
+
+The Referee checks incoming writes against the \texttt{contradictions} field of existing nodes. If a contradiction is detected, the write is rejected and a conflict issue node is created in \texttt{issues/} with tags \texttt{[conflict, referee]}.
+
+\section{The Six Methodology Claims}
+\label{sec:claims}
+
+The following six ideas constitute the Mastishk methodology, claimed as prior art as of publication of this paper.
+
+\paragraph{Claim 1: Three-layer semantic memory.}
+Agent memory is divided into three semantically distinct layers with different persistence, update frequency, and trust levels. This separation mirrors how human teams organise project knowledge and maps naturally to how agents should weight different types of memory.
+
+\paragraph{Claim 2: DAG traversal for context injection.}
+Relevant memory is identified by traversing a directed acyclic graph from dependency-linked seed nodes, not by vector similarity or recency. This preserves causal structure: if Task A depends on Goal B constrained by Constraint C, all three are returned together.
+
+\paragraph{Claim 3: Filesystem-native markdown nodes.}
+Every memory unit is a \texttt{.msk.md} file with YAML frontmatter. Human-readable, git-versionable, portable, requiring no database or binary format.
+
+\paragraph{Claim 4: Git as episodic memory.}
+The git history of \texttt{.mastishk/} is the agent's episodic memory. \texttt{mastishk checkpoint} commits the current state; the git log is queryable as a timeline of agent cognition.
+
+\paragraph{Claim 5: Confidence-weighted nodes with Referee.}
+Every node carries a confidence score (0.0--1.0). A Referee layer checks all incoming writes against existing contradictions. Silent overwrites of conflicting beliefs are impossible.
+
+\paragraph{Claim 6: Ambient memory capture.}
+Memory stays current through post-commit git hooks and agent MCP tool use, without developer overhead.
+
+\section{Reference Implementation}
+\label{sec:implementation}
+
+The reference implementation is written in TypeScript (strict mode) and published as three npm packages:
+
+\begin{itemize}
+  \item \textbf{\texttt{@mastishk/core}} (v0.1.0) --- schema (Zod), validation, read (\texttt{gray-matter}), write (append/replace logic), graph (DAG operations), traversal, inject.
+  \item \textbf{\texttt{@mastishk/cli}} (v0.1.0) --- \texttt{mastishk} CLI with commands: \texttt{init}, \texttt{inject}, \texttt{update}, \texttt{log}, \texttt{scan}, \texttt{status}, \texttt{checkpoint}.
+  \item \textbf{\texttt{@mastishk/mcp}} (v0.1.0) --- MCP server exposing five tools: \texttt{mastishk\_inject}, \texttt{mastishk\_update}, \texttt{mastishk\_log}, \texttt{mastishk\_status}, \texttt{mastishk\_checkpoint}.
+\end{itemize}
+
+\subsection{Key implementation decisions}
+
+\paragraph{gray-matter for frontmatter parsing.}
+The \texttt{gray-matter} library parses YAML frontmatter, but \texttt{js-yaml} (its YAML engine) automatically coerces ISO 8601 strings to JavaScript \texttt{Date} objects. We normalise date fields back to ISO strings immediately after parsing to satisfy Zod's string validation.
+
+\paragraph{Append-only state writes.}
+State layer writes prepend a timestamp header (\texttt{\#\#\# \{ISO\} --- \{agent\}}) before new content and append to the existing body. This means state nodes accumulate a timestamped log of all progress updates across sessions.
+
+\paragraph{updateNodeMeta.}
+A metadata-only update path is required for the CLI \texttt{update} command (changing \texttt{status}/\texttt{confidence} without triggering state-layer append). This is a SPEC-GAP in the current protocol version.
+
+\paragraph{Token budget.}
+The spec defines a 2000-token budget but does not specify tokenisation. We approximate 1 token = 4 characters (CHARS\_PER\_TOKEN = 4). Nodes are dropped in ascending confidence order until the budget is satisfied.
+
+\subsection{Compliance suite}
+
+The compliance suite at \texttt{tests/compliance/} contains 163 tests across 7 files, one per spec section. It is designed to be language-agnostic: a future Python or Go implementation that passes all tests is Mastishk-compliant.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+File & Spec section & Tests \\
+\midrule
+\texttt{01-node-format} & \S3 Node format & 36 \\
+\texttt{02-layer-semantics} & \S4 Layer semantics & 14 \\
+\texttt{03-graph-constraints} & \S5 Graph & 26 \\
+\texttt{04-inject-format} & \S6 Inject & 15 \\
+\texttt{05-write-back} & \S7 Write-back & 11 \\
+\texttt{06-mcp-tools} & \S9 MCP tools & 29 \\
+\texttt{07-cli-commands} & \S10 CLI & 32 \\
+\bottomrule
+\end{tabular}
+\caption{Compliance suite coverage by spec section}
+\end{table}
+
+\section{Related Work}
+\label{sec:related}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lllll}
+\toprule
+System & Storage & Structure & Multi-agent & Open protocol \\
+\midrule
+Mem0~\cite{mem0} & Hosted vector DB & Flat & No & No \\
+Graphiti~\cite{graphiti} & Neo4j & Graph & No & No \\
+MemGPT/Letta~\cite{packer2023memgpt} & In-process & Hierarchical & No & No \\
+LangMem & Vector + SQL & Flat & No & No \\
+agentmemory & Markdown & Flat & No & No \\
+\textbf{Mastishk} & \textbf{Filesystem} & \textbf{DAG (3-layer)} & \textbf{Yes} & \textbf{Yes} \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of agent memory systems}
+\end{table}
+
+The most relevant prior work is MemGPT~\cite{packer2023memgpt}, which introduces hierarchical in-context and out-of-context memory for LLM agents. Mastishk differs in three ways: (1) it targets coding agents specifically, (2) it uses the filesystem as the persistence layer rather than an in-process store, and (3) it is a multi-agent protocol rather than a single-agent library.
+
+GraphRAG~\cite{edge2024local} and related work on knowledge graphs for retrieval shares the insight that graph structure improves relevance over flat retrieval. Mastishk applies this insight specifically to project-level agent memory, with a three-layer semantic structure tailored to software development context.
+
+\section{Empirical Hypotheses}
+\label{sec:hypotheses}
+
+The following hypotheses are intended for future empirical validation:
+
+\paragraph{H1 --- Task continuity.}
+An agent using Mastishk memory completes a multi-session coding task in fewer sessions and with fewer contradictions than an agent using flat context injection or no memory.
+
+\paragraph{H2 --- Context efficiency.}
+\texttt{mastishk inject} delivers equivalent or better task performance at significantly lower token cost than full context injection, by traversing only the causally relevant subgraph.
+
+\paragraph{H3 --- Contradiction reduction.}
+The Referee layer reduces the rate at which agents produce outputs contradicting prior decisions, compared to agents operating without structured memory.
+
+These hypotheses are testable using the Claude API with reproducible task sets. Experimental results will be published at \url{https://mastishk.dev}.
+
+\section{Conclusion}
+
+We have presented Mastishk, an open protocol for structured, persistent, filesystem-native memory in AI coding agents. The core contribution is a three-layer DAG architecture with causal context injection, supported by a compliance suite that enables interoperability across implementations.
+
+The reference implementation is available at \url{https://github.com/mastishk-ai/mastishk} and on npm as \texttt{@mastishk/core}, \texttt{@mastishk/cli}, and \texttt{@mastishk/mcp}. All described methodologies are released as prior art under Apache 2.0.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+
+\bibitem{packer2023memgpt}
+Packer, C., Fang, V., Patil, S. G., Lin, K., Wooders, S., \& Gonzalez, J. E. (2023).
+\textit{MemGPT: Towards LLMs as Operating Systems}.
+arXiv:2310.08560.
+
+\bibitem{edge2024local}
+Edge, D., Trinh, H., Cheng, N., Bradley, J., Chao, A., Mody, A., ... \& Larson, J. (2024).
+\textit{From Local to Global: A Graph RAG Approach to Query-Focused Summarization}.
+arXiv:2404.16130.
+
+\bibitem{liu2023lost}
+Liu, N. F., Lin, K., Hewitt, J., Paranjape, A., Bevilacqua, M., Petroni, F., \& Liang, P. (2023).
+\textit{Lost in the Middle: How Language Models Use Long Contexts}.
+arXiv:2307.03172.
+
+\bibitem{mem0}
+Mem0.ai. (2024). \textit{Mem0: The Memory Layer for AI Agents}.
+\url{https://mem0.ai}.
+
+\bibitem{graphiti}
+Zep AI. (2024). \textit{Graphiti: Temporally-aware Knowledge Graph for AI Agents}.
+\url{https://github.com/getzep/graphiti}.
+
+\end{thebibliography}
+
+\end{document}

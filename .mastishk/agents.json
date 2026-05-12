@@ -1,0 +1,22 @@
+{
+  "version": "0.1",
+  "conflict_strategy": "flag",
+  "write_back": "required",
+  "registered_agents": [
+    {
+      "id": "claude-code",
+      "access": "read-write",
+      "trust": "high"
+    },
+    {
+      "id": "cursor",
+      "access": "read-write",
+      "trust": "high"
+    },
+    {
+      "id": "custom-agent",
+      "access": "read-write",
+      "trust": "medium"
+    }
+  ]
+}

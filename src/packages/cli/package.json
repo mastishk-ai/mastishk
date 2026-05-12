@@ -1,20 +1,40 @@
 {
   "name": "@mastishk/cli",
-  "version": "0.0.1",
-  "description": "CLI for the Mastishk protocol.",
+  "version": "0.1.0",
+  "description": "CLI for the Mastishk protocol — persistent structured memory for AI coding agents.",
   "license": "Apache-2.0",
   "author": "Mastishk Protocol Contributors",
+  "homepage": "https://mastishk.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mastishk-ai/mastishk.git",
+    "directory": "src/packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/mastishk-ai/mastishk/issues"
+  },
+  "keywords": [
+    "ai", "agent", "memory", "cli", "claude", "cursor", "llm",
+    "markdown", "protocol", "mastishk"
+  ],
   "type": "module",
   "bin": {
     "mastishk": "./dist/bin.js"
   },
   "main": "./dist/bin.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mastishk/core": "0.0.1",
+    "@mastishk/core": "0.1.0",
     "commander": "^12.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

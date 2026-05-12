@@ -6,6 +6,7 @@ import { updateCommand } from './commands/update-cmd.js';
 import { logCommand } from './commands/log-cmd.js';
 import { statusCommand } from './commands/status.js';
 import { checkpointCommand } from './commands/checkpoint.js';
+import { scanCommand } from './commands/scan.js';
 
 program
   .name('mastishk')
@@ -63,6 +64,15 @@ program
   .option('--message <msg>', 'commit message')
   .action(async (opts) => {
     await checkpointCommand({ message: opts.message }).catch(die);
+  });
+
+// Spec section 10: mastishk scan [--yes]
+program
+  .command('scan')
+  .description('Infer memory nodes from existing project files.')
+  .option('--yes', 'auto-accept all inferred nodes without prompting')
+  .action(async (opts) => {
+    await scanCommand({ autoConfirm: opts.yes ? 'yes' : undefined }).catch(die);
   });
 
 function die(err: unknown): never {
