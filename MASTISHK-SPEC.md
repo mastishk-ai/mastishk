@@ -1,6 +1,6 @@
 # MASTISHK-SPEC.md
 # Mastishk Protocol Specification
-# Version 0.1 — Draft
+# Version 0.2 — Draft
 
 **Authors:** Mastishk Protocol Contributors  
 **Organisation:** github.com/mastishk  
@@ -334,13 +334,18 @@ mastishk scan
 mastishk status
 mastishk checkpoint [--message <msg>]
 mastishk mcp [--port <port>]
+mastishk instruct --agent <name>
+mastishk hook
 ```
 
 `mastishk init` MUST:
 - Create the `.mastishk/` folder structure
 - Create `memory-map.json` with empty nodes and edges
 - Create `agents.json` with default config
-- Append a Mastishk section to `CLAUDE.md` if one exists in the project root
+- If `CLAUDE.md` exists in the project root and has no Mastishk section: append one (section 13)
+- If `CLAUDE.md` does not exist: create it with the Mastishk section as its sole content (section 13)
+- Attempt to install a post-commit git hook at `.git/hooks/post-commit` (section 12)
+- If the `intent/` layer is empty and a TTY is attached: run the interactive goal prompt (section 11.5)
 
 `mastishk scan` MUST:
 - Read `package.json` and infer project name, stack, and dependencies as `knowledge` nodes with `confidence: 0.6` and `scanned: true`
@@ -350,7 +355,167 @@ mastishk mcp [--port <port>]
 
 ---
 
-## 11. Compliance
+## 11. The instruct interface
+
+### 11.1 Purpose
+
+`mastishk instruct --agent <name>` generates an agent-specific briefing and, where applicable, writes the agent's configuration file so the agent has immediate access to project memory. It is the recommended first step after `mastishk init` when onboarding an agent to an existing project.
+
+### 11.2 Supported agents
+
+A compliant `instruct` implementation MUST support the following agent names:
+
+| Agent | Action |
+|---|---|
+| `claude-code` | Write or update the Mastishk section in `CLAUDE.md` in the project root (section 13) |
+| `cursor` | Write or update `.cursor/mcp.json` with the MCP server config (section 11.3) |
+| `windsurf` | Write or update `.windsurf/mcp.json` with the MCP server config (section 11.3) |
+| `api` | Print the full inject output for `"current task"` to stdout |
+
+### 11.3 MCP config format
+
+For `cursor` and `windsurf`, the written config MUST follow this structure exactly:
+
+```json
+{
+  "mcpServers": {
+    "mastishk": {
+      "command": "npx",
+      "args": ["@mastishk/mcp", "--memory-dir", ".mastishk"]
+    }
+  }
+}
+```
+
+The file MUST be valid JSON and MUST be written to the agent's config directory relative to the project root.
+
+### 11.4 Memory summary
+
+After completing the agent-specific action, `instruct` MUST print a memory summary in this format:
+
+```
+Memory summary for this project:
+─────────────────────────────────
+Goals:    {first line of the primary goal node body}
+Status:   {first line of the primary state task body}
+Issues:   {count of active issue nodes}
+Last updated by: {last_updated_by} ({relative time})
+─────────────────────────────────
+This agent now has the same memory as every other agent on this project.
+```
+
+The "primary goal node" is the first node of type `goal` in the `intent` layer found in `memory-map.json`. The "primary state task node" is the first node of type `task` in the `state` layer. If either is absent, the field SHOULD display `N/A`.
+
+### 11.5 Interactive goal prompt on init
+
+When `mastishk init` detects that the `intent/` layer is empty and a TTY is attached, it SHOULD run an interactive prompt to seed the project's memory with human-provided goals. The prompt MUST ask:
+
+1. What are you building? (required)
+2. What is the main goal? (required)
+3. Target date or milestone? (optional)
+4. Hard constraints — stack, budget, things to avoid? (optional)
+5. Current status? (optional; defaults to "Fresh project — nothing built yet.")
+
+From the answers, `mastishk init` MUST create:
+
+- `intent/goal-main.msk.md` — `type: goal`, `confidence: 1.0`, `created_by: human`, body from answers 1–3
+- `intent/constraints-main.msk.md` — `type: constraint`, `confidence: 1.0`, `created_by: human`, body from answer 4 (only if provided)
+- `state/progress-initial.msk.md` — `type: task`, `confidence: 1.0`, `created_by: human`, body from answer 5
+
+All three MUST be registered in `memory-map.json`.
+
+---
+
+## 12. Ambient capture via git hooks
+
+### 12.1 Purpose
+
+Ambient capture keeps memory current without manual developer intervention. It is achieved through a post-commit git hook installed automatically by `mastishk init`.
+
+### 12.2 Hook installation
+
+`mastishk init` MUST attempt to install a post-commit hook at `.git/hooks/post-commit` with this content:
+
+```sh
+#!/bin/sh
+npx @mastishk/cli hook
+```
+
+The hook file MUST be made executable (mode 0755 on POSIX systems). If no `.git/` directory exists in the project root, installation MUST be skipped silently with no error.
+
+### 12.3 Hook behaviour
+
+When `mastishk hook` is invoked, it MUST:
+
+1. Verify `.mastishk/` exists; exit silently if not
+2. Read the latest commit message via `git log -1 --pretty=%s`
+3. Classify the commit based on its prefix:
+   - `feat:` or `add:` → append body `"Completed: {message}"` to the primary state task node
+   - `fix:` → append body `"Fixed: {message}"` to the primary state task node
+   - `wip:` → append body `"In progress: {message}"` to the primary state task node
+4. If the commit prefix does not match any of the above, exit silently
+5. Append to the primary state task node following the append-only contract (section 7.2)
+6. Update `memory-map.json` with a new `updated_at` timestamp
+
+The "primary state task node" is the first node of `type: task` in the `state` layer found in `memory-map.json`. If no such node exists, a new node MUST be created at `state/progress.msk.md` with `id: progress`.
+
+---
+
+## 13. CLAUDE.md integration
+
+### 13.1 Purpose
+
+When Mastishk is initialised in a project that uses Claude Code, it injects a structured workflow briefing into `CLAUDE.md`. This ensures Claude Code automatically reads memory context at the start of every session without additional configuration.
+
+### 13.2 Detection and injection rules
+
+A compliant implementation MUST apply the following rules:
+
+- If `CLAUDE.md` exists and does not contain `## Mastishk memory`: append the section (section 13.3) at the end of the file
+- If `CLAUDE.md` does not exist: create it with the section (section 13.3) as its sole content
+- If `CLAUDE.md` already contains `## Mastishk memory`: leave it unchanged on `init`; `instruct --agent claude-code` MAY replace it with the current canonical format
+
+### 13.3 Section format
+
+The injected Mastishk section MUST contain at minimum:
+
+- A `## Mastishk memory` heading
+- An instruction to run `mastishk inject "<task>"` at session start
+- A description of the four memory layers and their update rules
+- Instructions for end-of-session memory maintenance
+
+The canonical format used by the reference implementation is:
+
+```markdown
+## Mastishk memory
+
+This project uses Mastishk for persistent agent memory.
+Memory lives in `.mastishk/` — do not edit these files manually.
+
+**At the start of every session — do this first, before anything else:**
+Run `mastishk inject "<task>"` and read the full output.
+It contains your goals, current state, constraints, and open issues.
+Do not start work until you have read it.
+
+**During the session:**
+- If you complete a task: update its status in `state/`
+- If you hit an error: log it with `mastishk log`
+- If you learn something about the architecture: add it to `knowledge/`
+
+**At the end of every session:**
+- Update `.mastishk/state/progress.msk.md` with what was done
+- Run `mastishk checkpoint` to commit memory state to git
+
+**Memory layers:**
+- `.mastishk/intent/` — goals and constraints. Never modify without human confirmation.
+- `.mastishk/state/` — current tasks and progress. Update freely.
+- `.mastishk/knowledge/` — architecture and decisions. Add as you learn.
+- `.mastishk/issues/` — errors and blockers. Always log, never delete.
+```
+
+---
+
+## 14. Compliance
 
 A Mastishk-compliant implementation is one that passes all tests in the compliance suite at `tests/compliance/`.
 
@@ -374,3 +539,4 @@ Implementations in any language that pass the compliance suite MAY list themselv
 | Version | Date | Notes |
 |---|---|---|
 | 0.1 | 2026-05-12 | Initial draft — prior art publication |
+| 0.2 | 2026-05-12 | Added sections 11 (instruct interface + interactive goal prompt), 12 (ambient capture via git hooks), 13 (CLAUDE.md integration). Compliance moved to section 14. Section 10 updated with `instruct` and `hook` CLI commands and expanded `init` requirements. |

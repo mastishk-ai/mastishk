@@ -209,14 +209,16 @@
     </div>
 
     <div class="code-block">
-      <span class="comment"># Add memory to your project</span><br />
+      <span class="comment"># Add memory to your project (prompts for goals, installs git hook)</span><br />
       <span class="cmd">npx mastishk init</span><br />
       <br />
-      <span class="comment"># Get causal context for your task</span><br />
-      <span class="cmd">npx mastishk inject</span> <span class="kw">"build JWT authentication"</span><br />
+      <span class="comment"># Connect your agent — one command</span><br />
+      <span class="cmd">npx mastishk instruct</span> <span class="kw">--agent claude-code</span><br />
+      <span class="cmd">npx mastishk instruct</span> <span class="kw">--agent cursor</span><br />
+      <span class="cmd">npx mastishk instruct</span> <span class="kw">--agent windsurf</span><br />
       <br />
-      <span class="comment"># Claude Desktop / Cursor / Windsurf: add to MCP config</span><br />
-      <span class="kw">"mastishk"</span>: { <span class="kw">"command"</span>: <span class="kw">"npx mastishk-mcp"</span> }
+      <span class="comment"># Get causal context for your task</span><br />
+      <span class="cmd">npx mastishk inject</span> <span class="kw">"build JWT authentication"</span>
     </div>
   </div>
 
@@ -286,16 +288,33 @@
   </section>
 
   <section>
-    <h2>MCP — for Claude, Cursor, Windsurf</h2>
-    <p style="color: var(--dim); margin-bottom: 24px;">Add one block to your MCP config. The agent gains five memory tools automatically.</p>
+    <h2>One command to connect any agent</h2>
+    <p style="color: var(--dim); margin-bottom: 24px;"><code style="color:var(--accent2)">mastishk instruct --agent &lt;name&gt;</code> writes the right config file, then prints a memory summary so your agent is ready immediately.</p>
     <div class="code-block">
-      <span class="comment">// claude_desktop_config.json</span><br />
+      <span class="comment"># Claude Code — updates CLAUDE.md with full memory workflow</span><br />
+      <span class="cmd">mastishk instruct</span> <span class="kw">--agent claude-code</span><br />
+      <br />
+      <span class="comment"># Cursor — writes .cursor/mcp.json</span><br />
+      <span class="cmd">mastishk instruct</span> <span class="kw">--agent cursor</span><br />
+      <br />
+      <span class="comment"># Windsurf — writes .windsurf/mcp.json</span><br />
+      <span class="cmd">mastishk instruct</span> <span class="kw">--agent windsurf</span><br />
+      <br />
+      <span class="comment"># Any custom agent — inject output to stdout for piping</span><br />
+      <span class="cmd">mastishk instruct</span> <span class="kw">--agent api</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>MCP — manual config</h2>
+    <p style="color: var(--dim); margin-bottom: 24px;">Or add one block directly to your MCP config. The agent gains five memory tools automatically.</p>
+    <div class="code-block">
+      <span class="comment">// .cursor/mcp.json · .windsurf/mcp.json · claude_desktop_config.json</span><br />
       {<br />
       &nbsp;&nbsp;<span class="kw">"mcpServers"</span>: {<br />
       &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">"mastishk"</span>: {<br />
       &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">"command"</span>: <span class="kw">"npx"</span>,<br />
-      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">"args"</span>: [<span class="kw">"mastishk-mcp"</span>],<br />
-      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">"env"</span>: { <span class="kw">"MASTISHK_DIR"</span>: <span class="kw">"/path/to/project/.mastishk"</span> }<br />
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">"args"</span>: [<span class="kw">"@mastishk/mcp"</span>, <span class="kw">"--memory-dir"</span>, <span class="kw">".mastishk"</span>]<br />
       &nbsp;&nbsp;&nbsp;&nbsp;}<br />
       &nbsp;&nbsp;}<br />
       }
@@ -314,7 +333,7 @@
       </div>
       <div class="pkg">
         <div class="name">@mastishk/cli</div>
-        <p>The <code>mastishk</code> command. init, inject, update, log, scan, status, checkpoint.</p>
+        <p>The <code>mastishk</code> command. init, inject, update, log, scan, status, checkpoint, instruct, hook.</p>
         <br />
         <code style="font-size:13px; color:var(--dim)">npm install -g @mastishk/cli</code>
       </div>

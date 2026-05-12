@@ -42,7 +42,7 @@ Filesystem-Native Memory in AI Coding Agents}}
 \maketitle
 
 \begin{abstract}
-We present Mastishk, an open protocol and reference implementation for persistent, structured memory in AI coding agents. Current AI coding agents---Claude Code, Cursor, GitHub Copilot, and GPT-based tools---are stateless by default. Each session begins with no knowledge of prior decisions, architecture choices, errors, or goals. Existing workarounds (context files, vector retrieval, proprietary memory layers) fail to scale, lack causal structure, and do not support multi-agent collaboration. Mastishk defines a three-layer memory architecture stored as markdown files with YAML frontmatter, organised as a directed acyclic graph, and versioned through git. A \texttt{mastishk inject} operation traverses the dependency graph from task-matched nodes rather than relying on vector similarity, preserving causal relationships. Any implementation that passes the compliance suite is Mastishk-compliant, enabling interoperability across agents, tools, and programming languages. We release the protocol specification, reference TypeScript implementation, and compliance test suite as prior art under Apache 2.0.
+We present Mastishk, an open protocol and reference implementation for persistent, structured memory in AI coding agents. Current AI coding agents---Claude Code, Cursor, GitHub Copilot, and GPT-based tools---are stateless by default. Each session begins with no knowledge of prior decisions, architecture choices, errors, or goals. Existing workarounds (context files, vector retrieval, proprietary memory layers) fail to scale, lack causal structure, and do not support multi-agent collaboration. Mastishk defines a three-layer memory architecture stored as markdown files with YAML frontmatter, organised as a directed acyclic graph, and versioned through git. A \texttt{mastishk inject} operation traverses the dependency graph from task-matched nodes rather than relying on vector similarity, preserving causal relationships. The protocol additionally specifies: (1) an \texttt{instruct} interface that generates agent-specific configuration for Claude Code, Cursor, Windsurf, and API agents in a single command; (2) automated ambient capture via post-commit git hooks; and (3) a \texttt{CLAUDE.md} integration format that ensures coding agents receive the correct memory workflow without manual configuration. Any implementation that passes the compliance suite is Mastishk-compliant, enabling interoperability across agents, tools, and programming languages. We release the protocol specification, reference TypeScript implementation, and compliance test suite as prior art under Apache 2.0.
 \end{abstract}
 
 \section{Introduction}
@@ -224,7 +224,7 @@ The git history of \texttt{.mastishk/} is the agent's episodic memory. \texttt{m
 Every node carries a confidence score (0.0--1.0). A Referee layer checks all incoming writes against existing contradictions. Silent overwrites of conflicting beliefs are impossible.
 
 \paragraph{Claim 6: Ambient memory capture.}
-Memory stays current through post-commit git hooks and agent MCP tool use, without developer overhead.
+Memory stays current through post-commit git hooks and agent MCP tool use, without developer overhead. The \texttt{mastishk init} command installs a post-commit hook that classifies commits by prefix (\texttt{feat:}, \texttt{fix:}, \texttt{wip:}) and appends structured entries to the state layer automatically. The \texttt{mastishk instruct --agent <name>} command generates agent-specific configuration so any supported coding agent (Claude Code, Cursor, Windsurf, or a custom API agent) is immediately briefed on project memory.
 
 \section{Reference Implementation}
 \label{sec:implementation}
@@ -233,9 +233,21 @@ The reference implementation is written in TypeScript (strict mode) and publishe
 
 \begin{itemize}
   \item \textbf{\texttt{@mastishk/core}} (v0.1.0) --- schema (Zod), validation, read (\texttt{gray-matter}), write (append/replace logic), graph (DAG operations), traversal, inject.
-  \item \textbf{\texttt{@mastishk/cli}} (v0.1.0) --- \texttt{mastishk} CLI with commands: \texttt{init}, \texttt{inject}, \texttt{update}, \texttt{log}, \texttt{scan}, \texttt{status}, \texttt{checkpoint}.
+  \item \textbf{\texttt{@mastishk/cli}} (v0.1.0) --- \texttt{mastishk} CLI with commands: \texttt{init}, \texttt{inject}, \texttt{update}, \texttt{log}, \texttt{scan}, \texttt{status}, \texttt{checkpoint}, \texttt{instruct}, \texttt{hook}.
   \item \textbf{\texttt{@mastishk/mcp}} (v0.1.0) --- MCP server exposing five tools: \texttt{mastishk\_inject}, \texttt{mastishk\_update}, \texttt{mastishk\_log}, \texttt{mastishk\_status}, \texttt{mastishk\_checkpoint}.
 \end{itemize}
+
+\subsection{The instruct pipeline}
+
+\texttt{mastishk instruct --agent <name>} is a one-command agent onboarding interface. For \texttt{claude-code}, it writes or updates the \texttt{CLAUDE.md} workflow briefing (spec section 13). For \texttt{cursor} and \texttt{windsurf}, it writes the appropriate MCP config file (\texttt{.cursor/mcp.json} or \texttt{.windsurf/mcp.json}). For \texttt{api}, it prints the full \texttt{inject} output to stdout for piping into any custom agent. After the agent-specific action, it prints a memory summary showing current goals, status, open issue count, and last-updated agent.
+
+\subsection{Git hook automation}
+
+\texttt{mastishk init} installs a post-commit hook at \texttt{.git/hooks/post-commit}. On every commit, \texttt{mastishk hook} reads the commit message, classifies it by prefix (\texttt{feat:}/\texttt{add:}, \texttt{fix:}, \texttt{wip:}), and appends a structured entry to the primary state task node. This implements claim 6 (ambient capture) without any developer action beyond conventional commit message prefixes.
+
+\subsection{CLAUDE.md integration}
+
+\texttt{mastishk init} writes a structured workflow briefing to \texttt{CLAUDE.md} in the project root. If the file exists, the section is appended; if it is absent, the file is created. The briefing instructs Claude Code to run \texttt{mastishk inject} at session start, update state during work, and run \texttt{mastishk checkpoint} at session end. This closes the loop between human commits, agent sessions, and memory persistence without additional tooling.
 
 \subsection{Key implementation decisions}
 
@@ -253,7 +265,7 @@ The spec defines a 2000-token budget but does not specify tokenisation. We appro
 
 \subsection{Compliance suite}
 
-The compliance suite at \texttt{tests/compliance/} contains 163 tests across 7 files, one per spec section. It is designed to be language-agnostic: a future Python or Go implementation that passes all tests is Mastishk-compliant.
+The compliance suite at \texttt{tests/compliance/} contains 163 tests across 7 files, one per spec section. It is designed to be language-agnostic: a future Python or Go implementation that passes all tests is Mastishk-compliant. The full test suite (including unit tests for the CLI, MCP, and new \texttt{instruct}/\texttt{hook} commands) totals 380 tests across 18 test files.
 
 \begin{table}[H]
 \centering

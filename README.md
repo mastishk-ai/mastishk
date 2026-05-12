@@ -43,9 +43,15 @@ When an agent needs context, `mastishk inject "your task"` traverses the depende
 # Add memory to your project
 npm install -g @mastishk/cli
 cd your-project
-mastishk init
+mastishk init          # scaffolds .mastishk/, prompts for goals, installs git hook
 
-# Tell your agent to inject context before starting a task
+# Connect your agent (pick one)
+mastishk instruct --agent claude-code   # updates CLAUDE.md — open Claude Code
+mastishk instruct --agent cursor        # writes .cursor/mcp.json — restart Cursor
+mastishk instruct --agent windsurf      # writes .windsurf/mcp.json — restart Windsurf
+mastishk instruct --agent api           # prints inject output for piping into any agent
+
+# Get causal context for a task
 mastishk inject "build JWT authentication"
 
 # Log an issue
@@ -58,30 +64,42 @@ mastishk status
 mastishk checkpoint
 ```
 
+After `mastishk init`, every git commit with a `feat:`, `fix:`, or `wip:` prefix automatically updates state memory via the installed post-commit hook. No manual effort.
+
 ---
 
-## MCP — for Claude, Cursor, Windsurf
+## Connecting agents
 
-Add the MCP server to get automatic memory access in any MCP-compatible agent:
+### Recommended: one command
+
+```bash
+mastishk instruct --agent claude-code   # CLAUDE.md — open Claude Code
+mastishk instruct --agent cursor        # .cursor/mcp.json — restart Cursor
+mastishk instruct --agent windsurf      # .windsurf/mcp.json — restart Windsurf
+mastishk instruct --agent api           # stdout — pipe into any custom agent
+```
+
+`instruct` writes the right config, then prints a memory summary so you can confirm the agent has the correct context.
+
+### Manual MCP config
 
 ```bash
 npm install -g @mastishk/mcp
 ```
 
-`claude_desktop_config.json`:
+`claude_desktop_config.json` / `.cursor/mcp.json` / `.windsurf/mcp.json`:
 ```json
 {
   "mcpServers": {
     "mastishk": {
       "command": "npx",
-      "args": ["mastishk-mcp"],
-      "env": { "MASTISHK_DIR": "/path/to/project/.mastishk" }
+      "args": ["@mastishk/mcp", "--memory-dir", ".mastishk"]
     }
   }
 }
 ```
 
-Five tools become available to the agent: `mastishk_inject`, `mastishk_update`, `mastishk_log`, `mastishk_status`, `mastishk_checkpoint`.
+Five tools become available: `mastishk_inject`, `mastishk_update`, `mastishk_log`, `mastishk_status`, `mastishk_checkpoint`.
 
 ---
 
@@ -103,7 +121,7 @@ Mastishk is a protocol, not just a library. Any implementation in any language t
 | Package | Description |
 |---|---|
 | [`@mastishk/core`](src/packages/core) | Schema, validation, read/write, graph, inject |
-| [`@mastishk/cli`](src/packages/cli) | `mastishk` CLI — init, inject, update, log, scan, status, checkpoint |
+| [`@mastishk/cli`](src/packages/cli) | `mastishk` CLI — init, inject, update, log, scan, status, checkpoint, instruct, hook |
 | [`@mastishk/mcp`](src/packages/mcp) | MCP server with 5 tools for Claude, Cursor, Windsurf |
 
 ---
@@ -124,7 +142,7 @@ Mastishk is a protocol, not just a library. Any implementation in any language t
 
 Any implementation that passes `tests/compliance/` is Mastishk-compliant and may be listed at [mastishk.dev/implementations](https://mastishk.dev/implementations).
 
-The compliance suite tests all eight spec sections: node format, layer semantics, graph constraints, inject output, write-back contract, conflict detection, MCP tools, and CLI commands.
+The compliance suite tests all spec sections: node format, layer semantics, graph constraints, inject output, write-back contract, conflict detection, MCP tools, and CLI commands.
 
 ---
 
