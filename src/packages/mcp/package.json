@@ -1,0 +1,21 @@
+{
+  "name": "@mastishk/mcp",
+  "version": "0.0.1",
+  "description": "MCP server exposing Mastishk memory tools to Claude, Cursor, and Windsurf.",
+  "license": "Apache-2.0",
+  "author": "Mastishk Protocol Contributors",
+  "type": "module",
+  "bin": {
+    "mastishk-mcp": "./dist/bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mastishk/core": "0.0.1",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

@@ -1,0 +1,305 @@
+import { join } from 'node:path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+import {
+  inject,
+  readMemoryMap,
+  writeMemoryMap,
+  writeNode,
+  upsertNode,
+  readNode,
+} from '@mastishk/core';
+import type { MskNode, MskLayer, MskType, MemoryMapNode } from '@mastishk/core';
+
+const execAsync = promisify(exec);
+
+export interface ToolContext {
+  mastishkDir: string;
+}
+
+function memMapPath(ctx: ToolContext): string {
+  return join(ctx.mastishkDir, 'memory-map.json');
+}
+
+// SPEC-GAP: spec defines mastishk_update params as (id, content, layer) but does not
+// specify how to infer the MskType for a new node from its layer. We use this mapping.
+const DEFAULT_TYPE_FOR_LAYER: Record<string, MskType> = {
+  intent: 'goal',
+  state: 'task',
+  knowledge: 'fact',
+  issues: 'issue',
+};
+
+// ---------------------------------------------------------------------------
+// mastishk_inject — spec section 9
+// ---------------------------------------------------------------------------
+export async function toolInject(
+  params: { task: string },
+  ctx: ToolContext
+): Promise<string> {
+  return inject(params.task, ctx.mastishkDir);
+}
+
+// ---------------------------------------------------------------------------
+// mastishk_update — spec section 9
+// ---------------------------------------------------------------------------
+export async function toolUpdate(
+  params: { id: string; content: string; layer: string },
+  ctx: ToolContext
+): Promise<string> {
+  const { id, content, layer } = params;
+  const map = await readMemoryMap(memMapPath(ctx));
+  const existing = map.nodes[id];
+
+  if (existing) {
+    // Update path: read existing node, write new content (append for state, replace for others)
+    const filePath = join(ctx.mastishkDir, existing.file);
+    const node = await readNode(filePath);
+    await writeNode(filePath, { ...node, body: content });
+
+    // Sync updated_at in memory-map
+    await writeMemoryMap(memMapPath(ctx), upsertNode(map, id, existing));
+    return `Updated node "${id}" in ${existing.layer} layer.`;
+  }
+
+  // Create path: build new node with defaults
+  const mskLayer = layer as MskLayer;
+  const mskType = DEFAULT_TYPE_FOR_LAYER[layer] ?? 'fact';
+  const relFile = `${layer}/${id}.msk.md`;
+  const filePath = join(ctx.mastishkDir, relFile);
+  const now = new Date().toISOString();
+
+  const node: MskNode = {
+    id,
+    type: mskType,
+    layer: mskLayer,
+    status: 'active',
+    // Agent-created nodes get confidence 0.7 (spec section 3.2 guidance)
+    confidence: 0.7,
+    created_by: 'mastishk-mcp',
+    created_at: now,
+    last_updated_by: 'mastishk-mcp',
+    last_updated_at: now,
+    dependencies: [],
+    contradictions: [],
+    body: content,
+  };
+
+  await writeNode(filePath, node);
+
+  const entry: MemoryMapNode = {
+    file: relFile,
+    layer: mskLayer,
+    type: mskType,
+    status: 'active',
+    confidence: 0.7,
+    dependencies: [],
+  };
+  await writeMemoryMap(memMapPath(ctx), upsertNode(map, id, entry));
+  return `Created node "${id}" in ${layer} layer.`;
+}
+
+// ---------------------------------------------------------------------------
+// mastishk_log — spec section 9
+// ---------------------------------------------------------------------------
+export async function toolLog(
+  // SPEC-GAP: spec says type?: string but doesn't define what values it accepts.
+  // We treat it as a tag name (e.g. "error", "warning") added to the issue node.
+  params: { message: string; type?: string },
+  ctx: ToolContext
+): Promise<string> {
+  const id = `issue-${Date.now()}`;
+  const now = new Date().toISOString();
+  const tags = params.type ? [params.type] : undefined;
+
+  const node: MskNode = {
+    id,
+    type: 'issue',
+    layer: 'issues',
+    status: 'active',
+    confidence: 1.0,
+    created_by: 'mastishk-mcp',
+    created_at: now,
+    last_updated_by: 'mastishk-mcp',
+    last_updated_at: now,
+    dependencies: [],
+    contradictions: [],
+    tags,
+    body: params.message,
+  };
+
+  const relFile = `issues/${id}.msk.md`;
+  await writeNode(join(ctx.mastishkDir, relFile), node);
+
+  const map = await readMemoryMap(memMapPath(ctx));
+  const entry: MemoryMapNode = {
+    file: relFile,
+    layer: 'issues',
+    type: 'issue',
+    status: 'active',
+    confidence: 1.0,
+    dependencies: [],
+    tags,
+  };
+  await writeMemoryMap(memMapPath(ctx), upsertNode(map, id, entry));
+  return `Logged issue "${id}": ${params.message}`;
+}
+
+// ---------------------------------------------------------------------------
+// mastishk_status — spec section 9
+// ---------------------------------------------------------------------------
+export async function toolStatus(
+  _params: Record<string, never>,
+  ctx: ToolContext
+): Promise<string> {
+  const map = await readMemoryMap(memMapPath(ctx));
+  const nodes = Object.entries(map.nodes);
+  const now = Date.now();
+
+  const byLayer: Record<string, number> = {};
+  const byStatus: Record<string, number> = {};
+  const openIssues: string[] = [];
+  const staleNodes: string[] = [];
+
+  for (const [id, node] of nodes) {
+    byLayer[node.layer] = (byLayer[node.layer] ?? 0) + 1;
+    byStatus[node.status] = (byStatus[node.status] ?? 0) + 1;
+    if (node.layer === 'issues' && node.status === 'active') openIssues.push(id);
+    const n = node as MemoryMapNode & { expires_at?: string };
+    if (n.expires_at && new Date(n.expires_at).getTime() < now && node.status !== 'resolved') {
+      staleNodes.push(id);
+    }
+  }
+
+  const lines = [
+    `Total nodes: ${nodes.length}`,
+    `By layer: ${JSON.stringify(byLayer)}`,
+    `By status: ${JSON.stringify(byStatus)}`,
+    `Open issues: ${openIssues.length > 0 ? openIssues.join(', ') : 'none'}`,
+    `Stale nodes: ${staleNodes.length > 0 ? staleNodes.join(', ') : 'none'}`,
+    `Last updated: ${map.updated_at}`,
+  ];
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// mastishk_checkpoint — spec section 9
+// ---------------------------------------------------------------------------
+export async function toolCheckpoint(
+  params: { message?: string },
+  ctx: ToolContext
+): Promise<string> {
+  const msg = params.message ?? `mastishk checkpoint — ${new Date().toISOString()}`;
+  const projectRoot = join(ctx.mastishkDir, '..');
+
+  try {
+    await execAsync(`git add "${ctx.mastishkDir}"`, { cwd: projectRoot });
+    await execAsync(`git commit -m "${msg}"`, { cwd: projectRoot });
+    return `Checkpoint committed: ${msg}`;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Git checkpoint failed: ${message}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tool definitions (spec section 9 — descriptions MUST enable first-time use)
+// ---------------------------------------------------------------------------
+export const TOOL_DEFINITIONS = [
+  {
+    name: 'mastishk_inject',
+    description:
+      'Get structured memory context for your current task. Call this at the start of any session ' +
+      'or when you need background on goals, decisions, or prior state. Pass a natural-language ' +
+      'description of what you are about to do. Returns a formatted context block with relevant ' +
+      'intent, state, knowledge, and open issues from this project\'s memory.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: {
+          type: 'string',
+          description: 'Natural-language description of the task you are about to perform.',
+        },
+      },
+      required: ['task'],
+    },
+  },
+  {
+    name: 'mastishk_update',
+    description:
+      'Update or create a memory node. Use this to persist a decision, record progress on a task, ' +
+      'add a technical fact, or document a goal. For state-layer nodes (tasks), content is appended ' +
+      'with a timestamp — existing entries are preserved. For intent and knowledge nodes, content ' +
+      'replaces the current body. If the node ID does not exist, it is created automatically.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Kebab-case identifier for the node, e.g. "task-implement-auth" or "decision-use-postgres".',
+        },
+        content: {
+          type: 'string',
+          description: 'Markdown content to write (appended for state nodes, replaced for others).',
+        },
+        layer: {
+          type: 'string',
+          enum: ['intent', 'state', 'knowledge', 'issues'],
+          description: 'Memory layer: intent (goals/constraints), state (tasks/progress), knowledge (decisions/facts), issues (bugs/blockers).',
+        },
+      },
+      required: ['id', 'content', 'layer'],
+    },
+  },
+  {
+    name: 'mastishk_log',
+    description:
+      'Append an issue, error, or blocker to memory. Use this whenever you encounter a problem ' +
+      'that should be tracked: build failures, unresolved questions, known bugs, or anything that ' +
+      'might block progress. Each call creates a new issue node. Pass type="error" for errors.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          description: 'Description of the issue, error, or blocker to log.',
+        },
+        type: {
+          type: 'string',
+          description: 'Optional tag for the log entry, e.g. "error", "warning", "question".',
+        },
+      },
+      required: ['message'],
+    },
+  },
+  {
+    name: 'mastishk_status',
+    description:
+      'Return a memory health summary for this project. Shows total node count by layer, ' +
+      'status distribution, all open (unresolved) issues, and any nodes whose expires_at date ' +
+      'has passed. Call this to understand the current state of project memory before starting ' +
+      'significant work.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'mastishk_checkpoint',
+    description:
+      'Commit the current state of .mastishk/ memory to git. Call this after completing a ' +
+      'significant unit of work — a feature, a decision, a resolved issue — to create a ' +
+      'durable snapshot of project memory. Equivalent to running "git add .mastishk/ && git commit".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          description: 'Optional commit message. Defaults to a timestamped checkpoint message.',
+        },
+      },
+      required: [],
+    },
+  },
+] as const;
