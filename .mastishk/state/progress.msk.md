@@ -14,6 +14,7 @@ tags: [phase-1, core, schema, validate]
 ---
 
 Phase 1 + 2 — @mastishk/core: schema, validate, read, write, graph, traverse, inject — COMPLETE.
+Phase 3 — @mastishk/cli: init, inject, update, log, status, checkpoint — COMPLETE.
 
 ### 2026-05-12T00:00:00Z — claude-code
 

@@ -2,6 +2,7 @@ import { writeFile, mkdir, readFile, access } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import matter from 'gray-matter';
 import { validate } from './validate.js';
+import { readNode } from './read.js';
 import type { MskNode } from './schema.js';
 
 export class MskWriteError extends Error {
@@ -77,4 +78,26 @@ export async function writeNode(filePath: string, node: MskNode): Promise<void> 
   }
 
   await writeFile(filePath, content, 'utf-8');
+}
+
+// SPEC-GAP: spec does not define a metadata-only update path. This is needed by the
+// CLI `update` command to change status/confidence without triggering state-layer append.
+// Reads the existing file, applies frontmatter-only updates, preserves body exactly.
+export async function updateNodeMeta(
+  filePath: string,
+  updates: Partial<Omit<MskNode, 'id' | 'body'>>
+): Promise<void> {
+  const existing = await readNode(filePath);
+  const updated: MskNode = {
+    ...existing,
+    ...updates,
+    id: existing.id,
+    body: existing.body,
+    last_updated_at: new Date().toISOString(),
+  };
+  const result = validate(updated);
+  if (!result.valid) {
+    throw new MskWriteError(filePath, result.errors);
+  }
+  await writeFile(filePath, serialize(updated), 'utf-8');
 }

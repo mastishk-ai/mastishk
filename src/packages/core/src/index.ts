@@ -11,7 +11,7 @@ export { validate } from './validate.js';
 
 export { readNode, MskReadError } from './read.js';
 
-export { writeNode, MskWriteError } from './write.js';
+export { writeNode, updateNodeMeta, MskWriteError } from './write.js';
 
 export {
   createEmptyMemoryMap,

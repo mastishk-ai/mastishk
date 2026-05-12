@@ -1,0 +1,20 @@
+{
+  "name": "@mastishk/cli",
+  "version": "0.0.1",
+  "description": "CLI for the Mastishk protocol.",
+  "license": "Apache-2.0",
+  "author": "Mastishk Protocol Contributors",
+  "type": "module",
+  "bin": {
+    "mastishk": "./dist/bin.js"
+  },
+  "main": "./dist/bin.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mastishk/core": "0.0.1",
+    "commander": "^12.1.0"
+  }
+}
