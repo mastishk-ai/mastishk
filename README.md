@@ -7,6 +7,6 @@ Persistent, structured memory for AI coding agents — built on markdown, backed
 - Protocol spec: MASTISHK-SPEC.md
 - Methodology and prior art: METHODOLOGY.md
 - Agent briefing: CLAUDE.md
-- Organisation: github.com/mastishk
+- Organisation: github.com/mastishk-ai
 - npm: @mastishk/core, @mastishk/cli, @mastishk/mcp
 - License: Apache 2.0

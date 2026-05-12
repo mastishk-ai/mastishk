@@ -11,7 +11,7 @@
 
 The core idea: the `.mastishk/` folder belongs to the project, not to any single agent. Every agent — Claude Code, Cursor, GPT, custom API agents — reads from and writes to the same memory. One brain for every agent on your project.
 
-- GitHub org: `github.com/mastishk`
+- GitHub org: `github.com/mastishk-ai`
 - npm packages: `@mastishk/core`, `@mastishk/cli`, `@mastishk/mcp`
 - Domain: `mastishk.dev`
 - License: Apache 2.0
