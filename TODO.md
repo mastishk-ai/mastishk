@@ -1,7 +1,7 @@
 # Mastishk — What's Left
 
-> Generated 2026-08-10, last updated 2026-08-10 (phases 9 + 10 closed out).
-> Baseline: 468 tests green, 25 test files, typecheck clean, core/cli/mcp all build.
+> Generated 2026-08-10, last updated 2026-08-10 (phases 9, 10 + 11 closed out).
+> Baseline: 578 tests green, 31 test files, typecheck clean, core/cli/mcp all build.
 > Spec: `MASTISHK-SPEC.md` v0.3 draft. Phase table: `CLAUDE.md`.
 
 ---
@@ -38,41 +38,51 @@ Phases 9 and 10 had been sitting uncommitted since 2026-06-12. Now committed.
 
 ---
 
-## 2. Phase 11 — map layer + plan nodes
+## 2. ~~Phase 11 — map layer + plan nodes~~ ✅ DONE 2026-08-10
 
-Nothing started. No `map.ts`, no `next` or `doctor` command. `findNextPlanStep()` already
-exists in `src/packages/core/src/catchup.ts:44` — that is the head start.
+All of §4.4, §16.1 step 4, and the §11 `map` / `next` / `doctor` commands are implemented,
+with compliance suites 10 and 11. 578 tests green.
 
-### 2.1 Map nodes (spec §4.4)
-- [ ] `core`: map node read/write helpers — `type: file` + required `path` field
-- [ ] `core`: inject renders a **Codebase map** section when map nodes match (spec §6.4)
-- [ ] `core`: inject renders stale map nodes with a visible `(stale)` marker
-- [ ] `core`: MUST NOT serve stale map content as authoritative — enforce, don't just annotate
+### 2.1 Map nodes (spec §4.4) ✅
+- [x] `core/map.ts` — `readMapEntries`, `markStaleByPaths`, `refreshMapNode`, `makeMapNode`, `pathIsCovered`
+- [x] inject renders a **Codebase map** section when map nodes match (already in place from Phase 9)
+- [x] inject renders stale map nodes with a visible `(stale)` marker
+- [x] `memory-map.json` caches `path` and `stale` so the hook matches changed paths without
+      opening every node file
 
-### 2.2 scan → map (spec §11)
-- [ ] `cli`: `scan` walks significant source files, emits map nodes (`confidence: 0.6, scanned: true`)
-- [ ] One-line purpose summary per file/module, body ≤ 5 sentences
-- [ ] Keep the existing per-node confirm/edit/skip prompt
+### 2.2 scan → map (spec §11) ✅
+- [x] `scan` walks source files and emits map nodes (`confidence: 0.6`, `scanned: true`)
+- [x] Summary prefers a leading file comment, falls back to the exported surface, and says
+      "Purpose not inferred" rather than inventing one
+- [x] Skips `node_modules`/`dist`/vendor dirs and `*.test.*` / `*.spec.*`
+- [x] De-duplicates truncated IDs so §3.1 uniqueness holds on deep paths
 
-### 2.3 Staleness contract (spec §16.1 step 4)
-- [ ] `cli hook`: read changed paths via `git log -1 --name-only`
-- [ ] Set `stale: true` on every map node whose `path` matches a changed file
-- [ ] Test: commit touching a mapped file flips the flag; inject then shows `(stale)`
+### 2.3 Staleness contract (spec §16.1 step 4) ✅
+- [x] `cli hook` reads changed paths via `git log -1 --name-only`
+- [x] Flags every map node whose `path` covers a changed file
+- [x] **Runs on every commit, not just `feat:`/`fix:`/`wip:`** — a `chore:` refactor rots the
+      map exactly as much as a feature does
+- [x] Path matching respects segment boundaries: `src/auth` never stales `src/authz`
+- [x] Tested against a real git repo, not a mock
 
-### 2.4 `mastishk map` (spec §11)
-- [ ] `map` — list map nodes
-- [ ] `map --stale` — list only stale entries
-- [ ] `map --refresh <id>` — clear the stale flag after verification
+### 2.4 `mastishk map` (spec §11) ✅
+- [x] `map`, `map --stale`, `map --refresh <id>`
 
-### 2.5 Plan nodes + `mastishk next` (spec §11)
-- [ ] Plan node `steps` field is already in schema v0.3 — wire up creation/update
-- [ ] `next` prints the first unblocked step of the most recently updated active plan node
-- [ ] Prints exactly `No active plan.` when none exists
+### 2.5 Plan nodes + `mastishk next` (spec §11) ✅
+- [x] `next` returns the first unblocked step of the most recently updated active plan
+- [x] Prints exactly `No active plan.` when none exists
+- [x] Distinguishes "no plan" from "active plan, nothing unblocked" — the second would
+      otherwise send an agent hunting for a plan that exists
 
-### 2.6 `mastishk doctor` (spec §11)
-- [ ] Validate: node schema, layer/type pairing, graph constraints, ID uniqueness
-- [ ] Validate: expired nodes, stale map entries, stale sessions
-- [ ] Actionable findings, **non-zero exit** on any MUST-level violation
+### 2.6 `mastishk doctor` (spec §11) ✅
+- [x] Validates schema, layer/type pairing, graph constraints, ID uniqueness
+- [x] Surfaces expired nodes, stale map entries, long-running sessions
+- [x] Also catches index drift: nodes on disk missing from `memory-map.json`, and index
+      entries pointing at files that do not exist
+- [x] `violation` vs `warning` severity; non-zero exit only on MUST-level violations
+- [x] **Found a real defect on first run:** `progress-phase-1` — the node CLAUDE.md tells every
+      agent to update — was missing from this project's own `memory-map.json`, so `inject`
+      had never surfaced it. Now indexed; doctor reports the folder healthy.
 
 ---
 
@@ -96,11 +106,12 @@ Server exposes only the 5 v0.2 tools. Three are missing.
 - [ ] Single-writer mode (§16.2) — serialise writes through the server
 
 ### 3.3 Compliance
-- [ ] `10-map-staleness.compliance.test.ts` — §4.4 + §16.1
-- [ ] `11-plans-doctor.compliance.test.ts` — §11 `next` / `doctor`
+- [x] `10-map-staleness.compliance.test.ts` — §4.4 + §16.1 (16 tests)
+- [x] `11-plans-doctor.compliance.test.ts` — §11 `next` / `doctor` (18 tests)
+- [x] `07-cli-commands` extended with `next` / `map` / `doctor`, renumbered §10 → §11
 - [ ] `12-onboarding.compliance.test.ts` — §14 AGENTS.md rules
 - [ ] Extend `06-mcp-tools.compliance.test.ts` to the 8-tool table
-- [ ] Spec §18 compliance list updated to match
+- [x] Spec §18 compliance list updated to match
 
 ---
 
@@ -180,8 +191,8 @@ FSE or ASE is arguably the better home for this work, with an EMSE extension aft
 | 0–8 | Spec, core, CLI, MCP, scan, compliance v0.2, v0.3 restructure | ✅ committed |
 | 9 | v0.3 core: schema, Referee, atomic writes, trust | ✅ verified vs §8.3/§17, committed 2026-08-10 |
 | 10 | v0.3 sessions: start/end, catchup, handoff, presence | ✅ verified vs §15, committed 2026-08-10 |
-| 11 | map layer, scan→map, staleness, plans, `next`, `doctor` | ⬜ not started |
-| 12 | AGENTS.md canonical, MCP v0.3 tools, compliance §14/§16 | ⬜ not started |
+| 11 | map layer, scan→map, staleness, plans, `next`, `doctor` | ✅ verified vs §4.4/§11/§16.1, committed 2026-08-10 |
+| 12 | AGENTS.md canonical, MCP v0.3 tools, compliance §14/§16 | ⬜ **next up** — the only v0.3 gaps left |
 | 13 | RelayBench E0 → full harness | ⬜ not started |
 | 14 | Empirical paper rewrite | ⬜ blocked on 13 |
 

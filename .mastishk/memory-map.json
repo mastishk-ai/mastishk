@@ -1,6 +1,6 @@
 {
   "version": "0.1",
-  "updated_at": "2026-06-12T10:00:00Z",
+  "updated_at": "2026-08-09T19:17:25.867Z",
   "nodes": {
     "decision-v03-shared-memory-redesign": {
       "file": "knowledge/decision-v03-shared-memory-redesign.msk.md",
@@ -115,6 +115,34 @@
       "tags": [
         "spec",
         "compliance"
+      ]
+    },
+    "progress-phase-1": {
+      "file": "state/progress.msk.md",
+      "layer": "state",
+      "type": "task",
+      "status": "active",
+      "confidence": 1,
+      "dependencies": [],
+      "tags": [
+        "phase-1",
+        "core",
+        "schema",
+        "validate"
+      ],
+      "keywords": [
+        "phase",
+        "mastishk",
+        "core",
+        "schema",
+        "validate",
+        "read",
+        "write",
+        "graph",
+        "traverse",
+        "inject",
+        "complete",
+        "init"
       ]
     }
   },

@@ -11,9 +11,10 @@ mastishk session start --agent claude-code --task "build JWT authentication"
 ```
 
 > **Status:** protocol spec v0.3 (draft). The reference implementation covers spec v0.2
-> plus the v0.3 session protocol (sessions, catchup, handoff) and write path (Referee,
-> trust, atomic writes). Still unbuilt — marked 🚧 below — are the codebase map, plan
-> nodes, `next`, and `doctor`; tracked in the [build phases](CLAUDE.md). npm publish pending.
+> plus the v0.3 session protocol (sessions, catchup, handoff), write path (Referee, trust,
+> atomic writes), and codebase map (map nodes, staleness contract, `next`, `doctor`).
+> Still unbuilt — marked 🚧 below — are `AGENTS.md` as the canonical onboarding file and
+> the three session MCP tools; tracked in the [build phases](CLAUDE.md). npm publish pending.
 
 ---
 
@@ -60,7 +61,7 @@ One command. Cursor now knows everything Claude Code learned. **Multiple agents,
   intent/         ← goals, constraints, resources (rarely changes)
   state/          ← tasks, plans, progress, handoffs (changes every session)
   knowledge/      ← decisions, stack, architecture (grows over time)
-  map/            ← which file does what — agents stop re-exploring  🚧
+  map/            ← which file does what — agents stop re-exploring
   issues/         ← errors and blockers (never deleted, only resolved)
   sessions/       ← who's active right now (ephemeral)
   agents.json     ← registered agents, trust levels, conflict strategy
@@ -90,14 +91,15 @@ mastishk instruct --agent api           # stdout — pipe into any custom agent
 
 # Daily use
 mastishk inject "build JWT authentication"   # causal context for a task
-mastishk next                                # first unblocked plan step  🚧
+mastishk next                                # first unblocked plan step
 mastishk log "Zod peer dep conflict"         # log an issue
 mastishk status                              # memory health
-mastishk doctor                              # full memory folder lint    🚧
+mastishk map --stale                         # map entries that need re-verifying
+mastishk doctor                              # full memory folder lint
 mastishk checkpoint                          # commit memory state to git
 ```
 
-After `mastishk init`, every `feat:`/`fix:`/`wip:` commit updates state memory automatically via the post-commit hook, and commits that touch mapped files flag their map entries stale 🚧 — memory stays current even when nobody maintains it.
+After `mastishk init`, every `feat:`/`fix:`/`wip:` commit updates state memory automatically via the post-commit hook, and commits that touch mapped files flag their map entries stale — memory stays current even when nobody maintains it.
 
 ---
 

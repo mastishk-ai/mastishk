@@ -147,7 +147,7 @@ npx @mastishk/cli instruct --agent … # onboard an agent (AGENTS.md canonical)
 | 8 | Spec v0.3 + README/METHODOLOGY/RESEARCH restructure (shared-memory protocol) | ✅ 2026-06-12 |
 | 9 | v0.3 core: schema v0.3 (new types/layers/fields), deterministic Referee, atomic writes + lock, trust enforcement, `commitNode` canonical write path | ✅ 2026-06-12 |
 | 10 | v0.3 sessions: session start/end, catchup, handoff nodes, presence registry | ✅ 2026-08-10 |
-| 11 | v0.3 map + plans: map layer, scan-generated map nodes, hook staleness flagging, plan nodes + `next`, `doctor` | ⬜ |
+| 11 | v0.3 map + plans: map layer, scan-generated map nodes, hook staleness flagging, plan nodes + `next`, `doctor` | ✅ 2026-08-10 |
 | 12 | v0.3 onboarding + compliance: AGENTS.md canonical instruct/init, new MCP tools, compliance suite for §15–§17 | ⬜ |
 | 13 | RelayBench: E0 exploration-token pilot, then harness per docs/RESEARCH.md | ⬜ |
 | 14 | Empirical paper rewrite of docs/paper.tex (after Phase 13 results) | ⬜ |

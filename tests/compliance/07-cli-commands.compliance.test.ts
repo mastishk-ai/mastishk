@@ -1,8 +1,11 @@
 /**
- * Compliance suite — Section 10: CLI interface
+ * Compliance suite — Section 11: CLI interface
  *
- * Tests that all required CLI commands are available and produce correct output/side-effects.
- * Commands tested: init, inject, update, log, status, scan, checkpoint
+ * Tests that all required CLI commands are available and produce correct
+ * output/side-effects. Commands tested here: init, inject, update, log, status,
+ * scan, checkpoint, next, map, doctor.
+ * session start/end and catchup are covered by 09-sessions; the map staleness
+ * contract is covered by 10-map-staleness.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, readFile, access } from 'node:fs/promises';
@@ -16,6 +19,9 @@ import { logCommand } from '../../src/packages/cli/src/commands/log-cmd.js';
 import { statusCommand } from '../../src/packages/cli/src/commands/status.js';
 import { scanCommand } from '../../src/packages/cli/src/commands/scan.js';
 import { checkpointCommand } from '../../src/packages/cli/src/commands/checkpoint.js';
+import { nextCommand } from '../../src/packages/cli/src/commands/next-cmd.js';
+import { mapCommand } from '../../src/packages/cli/src/commands/map-cmd.js';
+import { doctorCommand } from '../../src/packages/cli/src/commands/doctor-cmd.js';
 
 let tmpDir: string;
 
@@ -23,20 +29,29 @@ beforeEach(async () => { tmpDir = await mkdtemp(join(tmpdir(), 'msk-c07-')); });
 afterEach(async () => { await rm(tmpDir, { recursive: true, force: true }); });
 
 // ---------------------------------------------------------------------------
-// Section 10 — mastishk init
+// Section 11 — mastishk init
 // ---------------------------------------------------------------------------
 
-describe('section 10 — mastishk init', () => {
+describe('section 11 — mastishk init', () => {
   it('creates .mastishk/ folder', async () => {
     await initCommand({ cwd: tmpDir });
     await expect(access(join(tmpDir, '.mastishk'))).resolves.toBeUndefined();
   });
 
-  it('creates all four layer directories', async () => {
+  // Spec 11 — init MUST create the folder structure including map/ (v0.3)
+  it('creates every layer directory', async () => {
     await initCommand({ cwd: tmpDir });
-    for (const layer of ['intent', 'state', 'knowledge', 'issues']) {
+    for (const layer of ['intent', 'state', 'knowledge', 'map', 'issues']) {
       await expect(access(join(tmpDir, '.mastishk', layer))).resolves.toBeUndefined();
     }
+  });
+
+  // Spec 11 + 3 — sessions/ is ephemeral and MUST be excluded from version control
+  it('creates sessions/ and gitignores it', async () => {
+    await initCommand({ cwd: tmpDir });
+    await expect(access(join(tmpDir, '.mastishk', 'sessions'))).resolves.toBeUndefined();
+    const gitignore = await readFile(join(tmpDir, '.mastishk', '.gitignore'), 'utf-8');
+    expect(gitignore).toContain('sessions/');
   });
 
   it('creates memory-map.json with empty nodes and edges', async () => {
@@ -81,10 +96,10 @@ describe('section 10 — mastishk init', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 10 — mastishk inject
+// Section 11 — mastishk inject
 // ---------------------------------------------------------------------------
 
-describe('section 10 — mastishk inject', () => {
+describe('section 11 — mastishk inject', () => {
   it('returns a context string starting with ## Mastishk context', async () => {
     await initCommand({ cwd: tmpDir });
     const result = await injectCommand('build auth', { cwd: tmpDir });
@@ -97,10 +112,10 @@ describe('section 10 — mastishk inject', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 10 — mastishk update
+// Section 11 — mastishk update
 // ---------------------------------------------------------------------------
 
-describe('section 10 — mastishk update', () => {
+describe('section 11 — mastishk update', () => {
   it('throws when node id does not exist in memory-map', async () => {
     await initCommand({ cwd: tmpDir });
     await expect(updateCommand('goal-nonexistent', { cwd: tmpDir })).rejects.toThrow();
@@ -124,10 +139,10 @@ describe('section 10 — mastishk update', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 10 — mastishk log
+// Section 11 — mastishk log
 // ---------------------------------------------------------------------------
 
-describe('section 10 — mastishk log', () => {
+describe('section 11 — mastishk log', () => {
   it('creates an issue node with correct fields', async () => {
     await initCommand({ cwd: tmpDir });
     const id = await logCommand('Zod version conflict.', { cwd: tmpDir });
@@ -154,10 +169,10 @@ describe('section 10 — mastishk log', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 10 — mastishk status
+// Section 11 — mastishk status
 // ---------------------------------------------------------------------------
 
-describe('section 10 — mastishk status', () => {
+describe('section 11 — mastishk status', () => {
   it('returns a status result with totalNodes field', async () => {
     await initCommand({ cwd: tmpDir });
     const result = await statusCommand({ cwd: tmpDir });
@@ -187,10 +202,10 @@ describe('section 10 — mastishk status', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 10 — mastishk scan
+// Section 11 — mastishk scan
 // ---------------------------------------------------------------------------
 
-describe('section 10 — mastishk scan', () => {
+describe('section 11 — mastishk scan', () => {
   it('infers knowledge nodes from package.json', async () => {
     await initCommand({ cwd: tmpDir });
     await import('node:fs/promises').then((fs) =>
@@ -238,12 +253,67 @@ describe('section 10 — mastishk scan', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 10 — mastishk checkpoint
+// Section 11 — mastishk checkpoint
 // ---------------------------------------------------------------------------
 
-describe('section 10 — mastishk checkpoint', () => {
+describe('section 11 — mastishk checkpoint', () => {
   it('rejects with descriptive error outside a git repo', async () => {
     await initCommand({ cwd: tmpDir });
     await expect(checkpointCommand({ cwd: tmpDir })).rejects.toThrow('Git checkpoint failed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Section 11 — mastishk next  [v0.3]
+// ---------------------------------------------------------------------------
+
+describe('section 11 — mastishk next', () => {
+  it('is available and reports no active plan on a fresh folder', async () => {
+    await initCommand({ cwd: tmpDir });
+    const { stepId } = await nextCommand({ cwd: tmpDir });
+    expect(stepId).toBeNull();
+  });
+
+  it('rejects outside a mastishk project', async () => {
+    await expect(nextCommand({ cwd: tmpDir })).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Section 11 — mastishk map  [v0.3]
+// ---------------------------------------------------------------------------
+
+describe('section 11 — mastishk map', () => {
+  it('is available and returns an empty map on a fresh folder', async () => {
+    await initCommand({ cwd: tmpDir });
+    const { entries } = await mapCommand({ cwd: tmpDir });
+    expect(entries).toEqual([]);
+  });
+
+  it('accepts the --stale filter', async () => {
+    await initCommand({ cwd: tmpDir });
+    const { entries } = await mapCommand({ cwd: tmpDir, stale: true });
+    expect(entries).toEqual([]);
+  });
+
+  it('rejects outside a mastishk project', async () => {
+    await expect(mapCommand({ cwd: tmpDir })).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Section 11 — mastishk doctor  [v0.3]
+// ---------------------------------------------------------------------------
+
+describe('section 11 — mastishk doctor', () => {
+  it('reports a freshly initialised folder as healthy', async () => {
+    await initCommand({ cwd: tmpDir });
+    const report = await doctorCommand({ cwd: tmpDir });
+    expect(report.ok).toBe(true);
+    expect(report.violations).toBe(0);
+  });
+
+  it('rejects outside a mastishk project', async () => {
+    await expect(doctorCommand({ cwd: tmpDir })).rejects.toThrow();
   });
 });

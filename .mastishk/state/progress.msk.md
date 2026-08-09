@@ -20,6 +20,31 @@ Phase 5 — @mastishk/cli: scan command — COMPLETE.
 Phase 6 — tests/compliance/: full compliance suite — COMPLETE.
 Phase 7 — npm publish prep + arXiv paper + mastishk.dev — COMPLETE (human publish actions pending).
 
+### 2026-08-10T01:00:00Z — claude-code
+
+Phase 11 COMPLETE — v0.3 codebase map + plan nodes.
+Delivered in @mastishk/core: map.ts (readMapEntries, markStaleByPaths, refreshMapNode,
+makeMapNode, pathIsCovered), doctor.ts (full folder lint, violation/warning severity split,
+ok flag driving the exit code). memory-map.json entries now cache `path` and `stale` so
+ambient capture matches changed paths without opening every node file.
+In @mastishk/cli: `map [--stale] [--refresh <id>]`, `next`, `doctor`; scan walks source files
+and emits map nodes (confidence 0.6, scanned: true, tests and vendor dirs skipped); the
+post-commit hook reads `git log -1 --name-only` and flags covering map nodes stale.
+Inject already rendered the Codebase map section with (stale) markers from Phase 9.
+578 tests green (31 files; new: map, doctor, cli-map-next-doctor, scan-map, compliance 10 and
+11), typecheck clean, core/cli/mcp build.
+Design notes worth keeping: path coverage matches on segment boundaries so `src/auth` never
+stales `src/authz`; staleness flagging runs on EVERY commit, not just feat/fix/wip, because a
+`chore:` refactor rots the map exactly as much as a feature does; scan de-duplicates truncated
+map IDs to preserve §3.1 uniqueness.
+Dogfooding found a real defect: `mastishk doctor` on this project's own memory reported
+progress-phase-1 (the node CLAUDE.md tells every agent to update) missing from
+memory-map.json — so inject had never surfaced it. Indexed it via nodeToMapEntry; doctor now
+reports the folder healthy, 9 nodes, no findings. The tool earned its place on first run.
+Also marked §14.2 (AGENTS.md canonical) and §10 (three session MCP tools) as not yet
+implemented — both were specified without markers while the code does neither. Both are Phase 12.
+Next: Phase 12 (AGENTS.md canonical instruct/init, MCP v0.3 tools, compliance for §14/§16).
+
 ### 2026-08-10T00:00:00Z — claude-code
 
 Phase 10 COMPLETE — v0.3 session protocol. Verified clause-by-clause against spec §15 before

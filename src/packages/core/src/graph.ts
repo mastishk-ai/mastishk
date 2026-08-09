@@ -20,6 +20,13 @@ export interface MemoryMapNode {
   // v0.3 — cached salient body terms so inject seeding (spec 6.2) can match
   // body content without reading every node file.
   keywords?: string[];
+  // v0.3 — the repo-relative path a map node describes (spec 4.4). Indexed so
+  // ambient capture (spec 16.1) can match a commit's changed paths against map
+  // nodes without opening every node file on every commit.
+  path?: string;
+  // v0.3 — staleness flag mirrored from the node (spec 4.4), so `map --stale`
+  // and doctor can report without a full filesystem sweep.
+  stale?: boolean;
 }
 
 export interface MemoryMapEdge {
@@ -117,6 +124,8 @@ export function nodeToMapEntry(node: MskNode, file: string): MemoryMapNode {
     ...(node.tags !== undefined ? { tags: node.tags } : {}),
     ...(node.contradictions.length > 0 ? { contradictions: node.contradictions } : {}),
     ...(keywords.length > 0 ? { keywords } : {}),
+    ...(node.path !== undefined ? { path: node.path } : {}),
+    ...(node.stale !== undefined ? { stale: node.stale } : {}),
   };
 }
 

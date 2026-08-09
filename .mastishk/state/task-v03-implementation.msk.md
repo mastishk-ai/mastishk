@@ -51,3 +51,14 @@ from spec §15/§4.2 and README; false AGENTS.md claims in README marked 🚧 (t
 Phases 9 and 10 committed together after sitting uncommitted since June.
 Remaining: Phase 11 (map + plans + next + doctor), Phase 12 (AGENTS.md canonical, MCP v0.3 tools,
 compliance §14/§16), Phase 13 (RelayBench), Phase 14 (empirical paper). See TODO.md.
+
+### 2026-08-10T01:00:00Z — claude-code
+
+Phase 11 COMPLETE. core/map.ts + core/doctor.ts; cli map/next/doctor commands; scan emits map
+nodes; post-commit hook flags staleness on every commit. memory-map.json entries now cache
+path + stale (additive index change, old indexes still valid). Compliance 10 (map staleness,
+16 tests) and 11 (plans + doctor, 18 tests) added; 07 extended and renumbered §10 → §11.
+578 tests green, typecheck clean, all packages build.
+Doctor's first real run found progress-phase-1 unindexed in this project's own memory — fixed.
+Only v0.3 gaps left are Phase 12: AGENTS.md as canonical onboarding (§14.2) and the three
+session MCP tools (§10). Both now carry explicit not-implemented markers in the spec.

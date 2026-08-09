@@ -1,13 +1,14 @@
 // SPEC-GAP: scan command is mentioned in spec section 10 but inference rules are not defined.
 // We infer from package.json, git log, and README.md. All inference is best-effort and graceful.
-import { readFile, access } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, access, readdir } from 'node:fs/promises';
+import { join, extname, basename } from 'node:path';
 import {
   writeNode,
   readMemoryMap,
   writeMemoryMap,
   upsertNode,
   nodeToMapEntry,
+  makeMapNode,
 } from '@mastishk/core';
 import type { MskNode, MskLayer, MskType } from '@mastishk/core';
 import { mastishkDir, memoryMapPath, assertMastishkExists } from '../utils.js';
@@ -18,7 +19,7 @@ const execFileAsync = promisify(execFile);
 
 export interface ScanCandidate {
   node: MskNode;
-  source: 'package.json' | 'git-log' | 'readme';
+  source: 'package.json' | 'git-log' | 'readme' | 'source-walk';
 }
 
 export interface ScanOptions {
@@ -192,11 +193,137 @@ async function inferFromReadme(cwd: string): Promise<ScanCandidate[]> {
   return candidates;
 }
 
+// Spec section 11 [v0.3] — walk significant source files and generate map nodes.
+// "Significant" is deliberately conservative: scan seeds the map with low-confidence
+// entries that agents refine during sessions. A wrong entry costs more than a
+// missing one (spec 4.4), so we prefer to under-generate.
+
+const SOURCE_EXTENSIONS = new Set([
+  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
+  '.py', '.rb', '.go', '.rs', '.java', '.kt', '.swift',
+  '.c', '.h', '.cpp', '.hpp', '.cs', '.php',
+]);
+
+const SKIP_DIRS = new Set([
+  'node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt',
+  'vendor', '__pycache__', '.venv', 'venv', 'target', '.mastishk', '.cache',
+]);
+
+// Test files describe the code under test, not the codebase itself.
+const TEST_PATTERN = /\.(test|spec)\.[^.]+$/;
+
+const MAX_MAP_NODES = 40;
+const MAX_WALK_DEPTH = 6;
+
+async function walkSourceFiles(
+  root: string,
+  dir: string,
+  depth: number,
+  acc: string[]
+): Promise<void> {
+  if (depth > MAX_WALK_DEPTH || acc.length >= MAX_MAP_NODES) return;
+  let dirents;
+  try {
+    dirents = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of dirents) {
+    if (acc.length >= MAX_MAP_NODES) return;
+    if (entry.name.startsWith('.') && entry.name !== '.') continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+      await walkSourceFiles(root, full, depth + 1, acc);
+    } else if (entry.isFile()) {
+      if (!SOURCE_EXTENSIONS.has(extname(entry.name))) continue;
+      if (TEST_PATTERN.test(entry.name)) continue;
+      acc.push(full.slice(root.length + 1).replace(/\\/g, '/'));
+    }
+  }
+}
+
+/**
+ * A one-line purpose summary for a source file (spec 11). Prefers a leading
+ * file comment, since that is the author's own description; falls back to the
+ * exported surface, which at least tells an agent what the file offers.
+ */
+export function summariseSourceFile(relPath: string, content: string): string {
+  const lines = content.split('\n');
+
+  // A leading // or # comment block, or a /** */ docblock
+  const commentLines: string[] = [];
+  for (const raw of lines.slice(0, 15)) {
+    const line = raw.trim();
+    if (line.length === 0 && commentLines.length === 0) continue;
+    const stripped = line
+      .replace(/^\/\*\*?/, '')
+      .replace(/^\*\//, '')
+      .replace(/^\*/, '')
+      .replace(/^\/\//, '')
+      .replace(/^#(?!!)/, '')
+      .trim();
+    const isComment = /^(\/\/|#(?!!)|\/\*|\*)/.test(line);
+    if (!isComment) break;
+    if (stripped.length > 0) commentLines.push(stripped);
+    if (commentLines.length >= 2) break;
+  }
+  if (commentLines.length > 0) {
+    return commentLines.join(' ').slice(0, 240);
+  }
+
+  // Fall back to exported/declared names
+  const exports = new Set<string>();
+  for (const line of lines) {
+    const m =
+      /^export\s+(?:async\s+)?(?:function|class|const|interface|type|enum)\s+([A-Za-z0-9_$]+)/.exec(line) ??
+      /^(?:public\s+)?(?:class|def|func|fn|type)\s+([A-Za-z0-9_$]+)/.exec(line.trim());
+    if (m?.[1]) exports.add(m[1]);
+    if (exports.size >= 8) break;
+  }
+  if (exports.size > 0) {
+    return `Exports: ${[...exports].join(', ')}.`;
+  }
+
+  return `Source file ${basename(relPath)}. Purpose not inferred — refine this entry.`;
+}
+
+async function inferMapNodes(cwd: string): Promise<ScanCandidate[]> {
+  const paths: string[] = [];
+  await walkSourceFiles(cwd, cwd, 0, paths);
+
+  const candidates: ScanCandidate[] = [];
+  // toKebab truncates, so two deep paths can collapse to the same id. IDs must be
+  // unique project-wide (spec 3.1), so disambiguate rather than silently drop.
+  const usedIds = new Set<string>();
+
+  for (const relPath of paths) {
+    let content = '';
+    try {
+      content = await readFile(join(cwd, relPath), 'utf-8');
+    } catch {
+      continue;
+    }
+    const summary = summariseSourceFile(relPath, content);
+    const base = `map-${toKebab(relPath.replace(/\.[^.]+$/, ''))}`;
+    let id = base;
+    for (let n = 2; usedIds.has(id); n++) id = `${base}-${n}`;
+    usedIds.add(id);
+
+    candidates.push({
+      source: 'source-walk',
+      node: makeMapNode(id, relPath, `${summary}\n\nPath: \`${relPath}\``),
+    });
+  }
+  return candidates;
+}
+
 export async function scanInfer(cwd: string): Promise<ScanCandidate[]> {
   const results = await Promise.all([
     inferFromPackageJson(cwd),
     inferFromGitLog(cwd),
     inferFromReadme(cwd),
+    inferMapNodes(cwd),
   ]);
   return results.flat();
 }

@@ -86,3 +86,17 @@ export type {
 export { catchup, findNextPlanStep } from './catchup.js';
 
 export { extractKeywords } from './graph.js';
+
+export {
+  readMapEntries,
+  markStaleByPaths,
+  refreshMapNode,
+  makeMapNode,
+  pathIsCovered,
+} from './map.js';
+
+export type { MapEntry, StaleResult } from './map.js';
+
+export { doctor, formatDoctorReport } from './doctor.js';
+
+export type { DoctorReport, DoctorFinding, FindingSeverity } from './doctor.js';

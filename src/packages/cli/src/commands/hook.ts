@@ -10,6 +10,7 @@ import {
   writeMemoryMap,
   writeNode,
   readNode,
+  markStaleByPaths,
 } from '@mastishk/core';
 import type { MskNode } from '@mastishk/core';
 import { mastishkDir, memoryMapPath } from '../utils.js';
@@ -63,6 +64,32 @@ async function findStateTaskFile(cwd: string): Promise<string | null> {
   return null;
 }
 
+// Spec section 16.1 step 4 — read the commit's changed paths and stale every map
+// node covering one of them.
+async function flagStaleMapNodes(cwd: string): Promise<void> {
+  let changed: string[];
+  try {
+    const { stdout } = await execFileAsync('git', [
+      '-C', cwd, 'log', '-1', '--name-only', '--pretty=format:',
+    ]);
+    changed = stdout.split('\n').map((l) => l.trim()).filter(Boolean);
+  } catch {
+    return; // no git, no staleness signal — silent, per the hook's contract
+  }
+  if (changed.length === 0) return;
+
+  try {
+    const { flagged } = await markStaleByPaths(mastishkDir(cwd), changed);
+    if (flagged.length > 0) {
+      console.log(
+        `mastishk: flagged ${flagged.length} map entr${flagged.length === 1 ? 'y' : 'ies'} stale (${flagged.join(', ')})`
+      );
+    }
+  } catch {
+    // Ambient capture must never fail a commit.
+  }
+}
+
 export async function hookCommand(options: HookOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
 
@@ -78,8 +105,15 @@ export async function hookCommand(options: HookOptions = {}): Promise<void> {
     return; // not a git repo or no commits
   }
 
+  // Spec section 16.1 step 4 — flag map nodes covering paths this commit touched.
+  // This runs for EVERY commit, not just feat/fix/wip: a refactor under a
+  // `chore:` prefix staleness the map just as much as a feature does. A stale
+  // map entry is worse than no entry (spec 4.4), so this must not be conditional
+  // on the message prefix.
+  await flagStaleMapNodes(cwd);
+
   const kind = classifyCommit(commitMsg);
-  if (!kind) return; // only handle feat/add/fix/wip prefixes
+  if (!kind) return; // only handle feat/add/fix/wip prefixes for the state append
 
   const stateFilePath = await findStateTaskFile(cwd);
   const now = new Date().toISOString();

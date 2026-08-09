@@ -12,6 +12,9 @@ import type { AgentName } from './commands/instruct.js';
 import { hookCommand } from './commands/hook.js';
 import { sessionStartCommand, sessionEndCommand } from './commands/session-cmd.js';
 import { catchupCommand } from './commands/catchup-cmd.js';
+import { mapCommand } from './commands/map-cmd.js';
+import { nextCommand } from './commands/next-cmd.js';
+import { doctorCommand } from './commands/doctor-cmd.js';
 
 program
   .name('mastishk')
@@ -84,6 +87,33 @@ program
   .option('--agent <id>', 'agent ID (inferred when exactly one session is active)')
   .action(async (opts) => {
     await catchupCommand({ agent: opts.agent }).catch(die);
+  });
+
+// Spec section 11: mastishk next
+program
+  .command('next')
+  .description('First unblocked step of the most recently updated active plan.')
+  .action(async () => {
+    await nextCommand().catch(die);
+  });
+
+// Spec section 11: mastishk map [--stale] [--refresh <id>]
+program
+  .command('map')
+  .description('Inspect the codebase map: which file does what.')
+  .option('--stale', 'show only entries flagged stale by ambient capture')
+  .option('--refresh <id>', 'clear the stale flag after verifying an entry')
+  .action(async (opts) => {
+    await mapCommand({ stale: opts.stale, refresh: opts.refresh }).catch(die);
+  });
+
+// Spec section 11: mastishk doctor — non-zero exit on any MUST-level violation
+program
+  .command('doctor')
+  .description('Lint the whole memory folder; exits non-zero on spec violations.')
+  .action(async () => {
+    const report = await doctorCommand().catch(die);
+    if (!report.ok) process.exitCode = 1;
   });
 
 // Spec section 10: mastishk status
