@@ -10,6 +10,8 @@ import { scanCommand } from './commands/scan.js';
 import { instructCommand } from './commands/instruct.js';
 import type { AgentName } from './commands/instruct.js';
 import { hookCommand } from './commands/hook.js';
+import { sessionStartCommand, sessionEndCommand } from './commands/session-cmd.js';
+import { catchupCommand } from './commands/catchup-cmd.js';
 
 program
   .name('mastishk')
@@ -50,6 +52,38 @@ program
   .option('--error', 'tag this log entry as an error')
   .action(async (message: string, opts) => {
     await logCommand(message, { error: opts.error }).catch(die);
+  });
+
+// Spec section 15: mastishk session start / session end
+const session = program
+  .command('session')
+  .description('Session protocol: check in → catch up → work → hand off.');
+
+session
+  .command('start')
+  .description('Check in: register presence, catch up, get task context.')
+  .requiredOption('--agent <id>', 'your agent ID, e.g. claude-code')
+  .option('--task <task>', 'what you are about to work on')
+  .action(async (opts) => {
+    await sessionStartCommand({ agent: opts.agent, task: opts.task }).catch(die);
+  });
+
+session
+  .command('end')
+  .description('Hand off: write a handoff note, deregister, checkpoint.')
+  .option('--agent <id>', 'agent ID (inferred when exactly one session is active)')
+  .option('--handoff <text>', 'handoff note: Done / In flight / Watch out / Next')
+  .action(async (opts) => {
+    await sessionEndCommand({ agent: opts.agent, handoff: opts.handoff }).catch(die);
+  });
+
+// Spec section 15.4: mastishk catchup [--agent <id>]
+program
+  .command('catchup')
+  .description('What changed in memory since your last session.')
+  .option('--agent <id>', 'agent ID (inferred when exactly one session is active)')
+  .action(async (opts) => {
+    await catchupCommand({ agent: opts.agent }).catch(die);
   });
 
 // Spec section 10: mastishk status

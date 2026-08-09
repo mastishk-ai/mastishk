@@ -4,8 +4,9 @@ import {
   readMemoryMap,
   writeMemoryMap,
   upsertNode,
+  nodeToMapEntry,
 } from '@mastishk/core';
-import type { MskNode, MemoryMapNode } from '@mastishk/core';
+import type { MskNode } from '@mastishk/core';
 import { mastishkDir, memoryMapPath, assertMastishkExists } from '../utils.js';
 
 export interface LogOptions {
@@ -43,16 +44,7 @@ export async function logCommand(message: string, options: LogOptions = {}): Pro
 
   // Update memory-map.json
   const map = await readMemoryMap(memoryMapPath(cwd));
-  const entry: MemoryMapNode = {
-    file: relativeFile,
-    layer: 'issues',
-    type: 'issue',
-    status: 'active',
-    confidence: 1.0,
-    dependencies: [],
-    tags: node.tags,
-  };
-  await writeMemoryMap(memoryMapPath(cwd), upsertNode(map, id, entry));
+  await writeMemoryMap(memoryMapPath(cwd), upsertNode(map, id, nodeToMapEntry(node, relativeFile)));
 
   console.log(`Logged issue "${id}".`);
   return id;

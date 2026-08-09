@@ -4,12 +4,10 @@ import { promisify } from 'node:util';
 import {
   inject,
   readMemoryMap,
-  writeMemoryMap,
-  writeNode,
-  upsertNode,
   readNode,
+  commitNode,
 } from '@mastishk/core';
-import type { MskNode, MskLayer, MskType, MemoryMapNode } from '@mastishk/core';
+import type { MskNode, MskLayer, MskType, MemoryMapNode, CommitResult } from '@mastishk/core';
 
 const execAsync = promisify(exec);
 
@@ -29,6 +27,21 @@ const DEFAULT_TYPE_FOR_LAYER: Record<string, MskType> = {
   knowledge: 'fact',
   issues: 'issue',
 };
+
+// SPEC-GAP: MCP tool calls do not carry the identity of the underlying agent,
+// so all MCP writes are attributed to this ID for spec 8.1 purposes.
+const MCP_AGENT_ID = 'mastishk-mcp';
+
+function describeRejection(result: CommitResult): string {
+  if (result.rejected === 'conflict') {
+    return (
+      `Write rejected by the Referee: it contradicts ${result.conflictsWith?.join(', ')}.` +
+      (result.conflictNodeId ? ` Conflict logged as "${result.conflictNodeId}".` : '') +
+      ' Resolve the contradiction, then retry.'
+    );
+  }
+  return `Write rejected: ${result.reason ?? 'not permitted'}.`;
+}
 
 // ---------------------------------------------------------------------------
 // mastishk_inject — spec section 9
@@ -52,21 +65,21 @@ export async function toolUpdate(
   const existing = map.nodes[id];
 
   if (existing) {
-    // Update path: read existing node, write new content (append for state, replace for others)
-    const filePath = join(ctx.mastishkDir, existing.file);
-    const node = await readNode(filePath);
-    await writeNode(filePath, { ...node, body: content });
-
-    // Sync updated_at in memory-map
-    await writeMemoryMap(memMapPath(ctx), upsertNode(map, id, existing));
+    // Update path: read existing node, commit new content through the canonical
+    // write path (Referee + trust, spec 8/17). Append for state, replace for others.
+    const node = await readNode(join(ctx.mastishkDir, existing.file));
+    const result = await commitNode(ctx.mastishkDir, {
+      ...node,
+      body: content,
+      last_updated_by: MCP_AGENT_ID,
+    });
+    if (!result.committed) return describeRejection(result);
     return `Updated node "${id}" in ${existing.layer} layer.`;
   }
 
   // Create path: build new node with defaults
   const mskLayer = layer as MskLayer;
   const mskType = DEFAULT_TYPE_FOR_LAYER[layer] ?? 'fact';
-  const relFile = `${layer}/${id}.msk.md`;
-  const filePath = join(ctx.mastishkDir, relFile);
   const now = new Date().toISOString();
 
   const node: MskNode = {
@@ -76,26 +89,17 @@ export async function toolUpdate(
     status: 'active',
     // Agent-created nodes get confidence 0.7 (spec section 3.2 guidance)
     confidence: 0.7,
-    created_by: 'mastishk-mcp',
+    created_by: MCP_AGENT_ID,
     created_at: now,
-    last_updated_by: 'mastishk-mcp',
+    last_updated_by: MCP_AGENT_ID,
     last_updated_at: now,
     dependencies: [],
     contradictions: [],
     body: content,
   };
 
-  await writeNode(filePath, node);
-
-  const entry: MemoryMapNode = {
-    file: relFile,
-    layer: mskLayer,
-    type: mskType,
-    status: 'active',
-    confidence: 0.7,
-    dependencies: [],
-  };
-  await writeMemoryMap(memMapPath(ctx), upsertNode(map, id, entry));
+  const result = await commitNode(ctx.mastishkDir, node);
+  if (!result.committed) return describeRejection(result);
   return `Created node "${id}" in ${layer} layer.`;
 }
 
@@ -118,9 +122,9 @@ export async function toolLog(
     layer: 'issues',
     status: 'active',
     confidence: 1.0,
-    created_by: 'mastishk-mcp',
+    created_by: MCP_AGENT_ID,
     created_at: now,
-    last_updated_by: 'mastishk-mcp',
+    last_updated_by: MCP_AGENT_ID,
     last_updated_at: now,
     dependencies: [],
     contradictions: [],
@@ -128,20 +132,8 @@ export async function toolLog(
     body: params.message,
   };
 
-  const relFile = `issues/${id}.msk.md`;
-  await writeNode(join(ctx.mastishkDir, relFile), node);
-
-  const map = await readMemoryMap(memMapPath(ctx));
-  const entry: MemoryMapNode = {
-    file: relFile,
-    layer: 'issues',
-    type: 'issue',
-    status: 'active',
-    confidence: 1.0,
-    dependencies: [],
-    tags,
-  };
-  await writeMemoryMap(memMapPath(ctx), upsertNode(map, id, entry));
+  const result = await commitNode(ctx.mastishkDir, node);
+  if (!result.committed) return describeRejection(result);
   return `Logged issue "${id}": ${params.message}`;
 }
 

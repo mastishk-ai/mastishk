@@ -9,19 +9,25 @@ import {
   writeNode,
   readMemoryMap,
   upsertNode,
+  nodeToMapEntry,
 } from '@mastishk/core';
-import type { MskNode, MemoryMapNode } from '@mastishk/core';
+import type { MskNode } from '@mastishk/core';
 import { mastishkDir, memoryMapPath } from '../utils.js';
 
-// Default agents.json per spec section 8
+// Default agents.json per spec section 9. The reference CLI and MCP server act
+// on behalf of the human / primary agents, so they register as high trust;
+// projects can demote them in agents.json.
 const DEFAULT_AGENTS = {
-  version: '0.1',
+  version: '0.3',
   conflict_strategy: 'flag',
   write_back: 'required',
+  session_timeout_hours: 8,
   registered_agents: [
-    { id: 'claude-code', access: 'read-write', trust: 'high' },
-    { id: 'cursor', access: 'read-write', trust: 'high' },
-    { id: 'custom-agent', access: 'read-write', trust: 'medium' },
+    { id: 'claude-code', access: 'read-write', trust: 'high', last_session_at: null },
+    { id: 'cursor', access: 'read-write', trust: 'high', last_session_at: null },
+    { id: 'mastishk-cli', access: 'read-write', trust: 'high', last_session_at: null },
+    { id: 'mastishk-mcp', access: 'read-write', trust: 'high', last_session_at: null },
+    { id: 'custom-agent', access: 'read-write', trust: 'medium', last_session_at: null },
   ],
 };
 
@@ -85,16 +91,7 @@ async function writeInitNode(cwd: string, node: MskNode): Promise<void> {
   const filePath = join(mastishkDir(cwd), relFile);
   await writeNode(filePath, node);
   const map = await readMemoryMap(memoryMapPath(cwd));
-  const entry: MemoryMapNode = {
-    file: relFile,
-    layer: node.layer,
-    type: node.type,
-    status: node.status,
-    confidence: node.confidence,
-    dependencies: node.dependencies,
-    tags: node.tags,
-  };
-  await writeMemoryMap(memoryMapPath(cwd), upsertNode(map, node.id, entry));
+  await writeMemoryMap(memoryMapPath(cwd), upsertNode(map, node.id, nodeToMapEntry(node, relFile)));
 }
 
 export async function injectClaudeMd(cwd: string): Promise<boolean> {
@@ -129,10 +126,13 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
     console.warn(`Warning: .mastishk/ already exists at ${dir}. Re-initialising.`);
   }
 
-  // Create folder structure
-  for (const layer of ['intent', 'state', 'knowledge', 'issues']) {
+  // Create folder structure (spec section 3 — v0.3 adds map/ and sessions/)
+  for (const layer of ['intent', 'state', 'knowledge', 'map', 'issues', 'sessions']) {
     await mkdir(join(dir, layer), { recursive: true });
   }
+
+  // Spec section 3: sessions/ is ephemeral and excluded from version control
+  await writeFile(join(dir, '.gitignore'), 'sessions/\n.lock\n', 'utf-8');
 
   // Spec section 10: memory-map.json with empty nodes and edges
   await writeMemoryMap(memoryMapPath(cwd), createEmptyMemoryMap());

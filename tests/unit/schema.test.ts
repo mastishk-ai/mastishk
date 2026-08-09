@@ -26,22 +26,54 @@ describe('validate — spec section 3.4 example node', () => {
   });
 });
 
-describe('validate — all valid type values (spec section 3.2)', () => {
-  const types = ['goal', 'task', 'decision', 'constraint', 'issue', 'fact'] as const;
-  for (const type of types) {
-    it(`accepts type: ${type}`, () => {
-      expect(validate({ ...exampleNode, type }).valid).toBe(true);
+// Spec section 3.3 (v0.3) — every type is only valid in its paired layer
+const TYPE_LAYER_PAIRS = {
+  goal: 'intent',
+  constraint: 'intent',
+  resource: 'intent',
+  task: 'state',
+  plan: 'state',
+  handoff: 'state',
+  decision: 'knowledge',
+  fact: 'knowledge',
+  file: 'map',
+  issue: 'issues',
+} as const;
+
+describe('validate — all valid type values in their layer (spec section 3.2/3.3)', () => {
+  for (const [type, layer] of Object.entries(TYPE_LAYER_PAIRS)) {
+    it(`accepts type: ${type} in layer: ${layer}`, () => {
+      const extra = layer === 'map' ? { path: 'src/example.ts' } : {};
+      expect(validate({ ...exampleNode, type, layer, ...extra }).valid).toBe(true);
     });
   }
 });
 
-describe('validate — all valid layer values (spec section 3.2)', () => {
-  const layers = ['intent', 'state', 'knowledge', 'issues'] as const;
-  for (const layer of layers) {
-    it(`accepts layer: ${layer}`, () => {
-      expect(validate({ ...exampleNode, layer }).valid).toBe(true);
+describe('validate — layer/type pairing enforcement (spec section 3.3)', () => {
+  it('rejects a type outside its layer (task in intent)', () => {
+    const result = validate({ ...exampleNode, type: 'task', layer: 'intent' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('not allowed in layer');
+  });
+
+  it('rejects a map node without a path', () => {
+    const result = validate({ ...exampleNode, type: 'file', layer: 'map' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('path');
+  });
+
+  it('rejects steps on a non-plan node', () => {
+    const result = validate({ ...exampleNode, steps: ['task-a'] });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('steps');
+  });
+
+  it('accepts steps on a plan node', () => {
+    const result = validate({
+      ...exampleNode, type: 'plan', layer: 'state', steps: ['task-a'],
     });
-  }
+    expect(result.valid).toBe(true);
+  });
 });
 
 describe('validate — all valid status values (spec section 3.2)', () => {

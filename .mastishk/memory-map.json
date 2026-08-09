@@ -1,7 +1,55 @@
 {
   "version": "0.1",
-  "updated_at": "2026-05-12T13:21:57.172Z",
+  "updated_at": "2026-06-12T10:00:00Z",
   "nodes": {
+    "decision-v03-shared-memory-redesign": {
+      "file": "knowledge/decision-v03-shared-memory-redesign.msk.md",
+      "layer": "knowledge",
+      "type": "decision",
+      "status": "active",
+      "confidence": 1,
+      "dependencies": [
+        "goal-mastishk-launch"
+      ],
+      "tags": [
+        "v0.3",
+        "redesign",
+        "sessions",
+        "shared-memory",
+        "relaybench"
+      ]
+    },
+    "task-v03-implementation": {
+      "file": "state/task-v03-implementation.msk.md",
+      "layer": "state",
+      "type": "task",
+      "status": "active",
+      "confidence": 1,
+      "dependencies": [
+        "decision-v03-shared-memory-redesign"
+      ],
+      "tags": [
+        "v0.3",
+        "implementation",
+        "phases-9-14"
+      ]
+    },
+    "issue-npm-not-on-path": {
+      "file": "issues/issue-npm-not-on-path.msk.md",
+      "layer": "issues",
+      "type": "issue",
+      "status": "resolved",
+      "confidence": 1,
+      "dependencies": [
+        "task-v03-implementation"
+      ],
+      "tags": [
+        "environment",
+        "blocker",
+        "npm",
+        "tests"
+      ]
+    },
     "goal-mastishk-launch": {
       "file": "intent/goal-mastishk-launch.msk.md",
       "layer": "intent",
@@ -71,6 +119,21 @@
     }
   },
   "edges": [
+    {
+      "from": "decision-v03-shared-memory-redesign",
+      "to": "goal-mastishk-launch",
+      "relation": "depends-on"
+    },
+    {
+      "from": "task-v03-implementation",
+      "to": "decision-v03-shared-memory-redesign",
+      "relation": "depends-on"
+    },
+    {
+      "from": "issue-npm-not-on-path",
+      "to": "task-v03-implementation",
+      "relation": "depends-on"
+    },
     {
       "from": "fact-append-only-rule",
       "to": "goal-mastishk-launch",

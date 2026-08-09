@@ -91,12 +91,25 @@ describe('section 3.2 — required fields present', () => {
   }
 });
 
-describe('section 3.2 — type enum', () => {
-  const validTypes = ['goal', 'task', 'decision', 'constraint', 'issue', 'fact'] as const;
+// Spec section 3.3 (v0.3) — every type is only valid in its paired layer
+const TYPE_LAYER_PAIRS = [
+  ['goal', 'intent'],
+  ['constraint', 'intent'],
+  ['resource', 'intent'],
+  ['task', 'state'],
+  ['plan', 'state'],
+  ['handoff', 'state'],
+  ['decision', 'knowledge'],
+  ['fact', 'knowledge'],
+  ['file', 'map'],
+  ['issue', 'issues'],
+] as const;
 
-  for (const t of validTypes) {
-    it(`accepts type: ${t}`, () => {
-      expect(validate(baseNode({ type: t })).valid).toBe(true);
+describe('section 3.2/3.3 — type enum (in paired layer)', () => {
+  for (const [t, l] of TYPE_LAYER_PAIRS) {
+    it(`accepts type: ${t} in layer: ${l}`, () => {
+      const extra = l === 'map' ? { path: 'src/example.ts' } : {};
+      expect(validate(baseNode({ type: t, layer: l, ...extra })).valid).toBe(true);
     });
   }
 
@@ -104,14 +117,29 @@ describe('section 3.2 — type enum', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(validate(baseNode({ type: 'bug' as any })).valid).toBe(false);
   });
+
+  it('rejects a type outside its paired layer (spec section 3.3)', () => {
+    expect(validate(baseNode({ type: 'task', layer: 'intent' })).valid).toBe(false);
+  });
+
+  it('rejects a map node without a path (spec section 4.4)', () => {
+    expect(validate(baseNode({ type: 'file', layer: 'map' })).valid).toBe(false);
+  });
 });
 
 describe('section 3.2 — layer enum', () => {
-  const validLayers = ['intent', 'state', 'knowledge', 'issues'] as const;
+  const layerWithType = [
+    ['intent', 'goal'],
+    ['state', 'task'],
+    ['knowledge', 'fact'],
+    ['map', 'file'],
+    ['issues', 'issue'],
+  ] as const;
 
-  for (const l of validLayers) {
+  for (const [l, t] of layerWithType) {
     it(`accepts layer: ${l}`, () => {
-      expect(validate(baseNode({ layer: l })).valid).toBe(true);
+      const extra = l === 'map' ? { path: 'src/example.ts' } : {};
+      expect(validate(baseNode({ layer: l, type: t, ...extra })).valid).toBe(true);
     });
   }
 

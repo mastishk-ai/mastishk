@@ -51,7 +51,7 @@ describe('section 10 — mastishk init', () => {
     await initCommand({ cwd: tmpDir });
     const raw = await readFile(join(tmpDir, '.mastishk', 'agents.json'), 'utf-8');
     const agents = JSON.parse(raw) as Record<string, unknown>;
-    expect(agents['version']).toBe('0.1');
+    expect(agents['version']).toBe('0.3');
     expect(agents['conflict_strategy']).toBe('flag');
     expect(agents['write_back']).toBe('required');
     expect(Array.isArray(agents['registered_agents'])).toBe(true);

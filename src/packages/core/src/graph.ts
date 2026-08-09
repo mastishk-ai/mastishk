@@ -1,6 +1,8 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { MskLayer, MskType, MskStatus } from './schema.js';
+import { writeFileAtomic } from './atomic.js';
+import { acquireLock } from './lock.js';
+import type { MskLayer, MskType, MskStatus, MskNode } from './schema.js';
 
 // Spec section 5.1 — memory-map.json structure
 
@@ -12,6 +14,12 @@ export interface MemoryMapNode {
   confidence: number;
   dependencies: string[];
   tags?: string[];
+  // v0.3 — indexed so the Referee (spec 8.3) can check declared conflicts in
+  // both directions without reading every node file.
+  contradictions?: string[];
+  // v0.3 — cached salient body terms so inject seeding (spec 6.2) can match
+  // body content without reading every node file.
+  keywords?: string[];
 }
 
 export interface MemoryMapEdge {
@@ -57,10 +65,59 @@ export async function readMemoryMap(filePath: string): Promise<MemoryMap> {
   return JSON.parse(raw) as MemoryMap;
 }
 
-export async function writeMemoryMap(filePath: string, map: MemoryMap): Promise<void> {
+// Spec section 17 — memory-map.json updates are atomic and guarded by .mastishk/.lock
+export async function writeMemoryMap(
+  filePath: string,
+  map: MemoryMap,
+  options: { agent?: string } = {}
+): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
-  const updated: MemoryMap = { ...map, updated_at: new Date().toISOString() };
-  await writeFile(filePath, JSON.stringify(updated, null, 2) + '\n', 'utf-8');
+  const release = await acquireLock(dirname(filePath), options.agent ?? 'unknown');
+  try {
+    const updated: MemoryMap = { ...map, updated_at: new Date().toISOString() };
+    await writeFileAtomic(filePath, JSON.stringify(updated, null, 2) + '\n');
+  } finally {
+    await release();
+  }
+}
+
+// Spec section 5.1 — keywords cache: salient terms from the node body, so seed
+// matching can consider body content without filesystem reads. Deliberately
+// simple; richer seeders are pluggable (spec 6.2).
+const STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'are', 'was', 'were',
+  'have', 'has', 'had', 'not', 'but', 'all', 'its', 'their', 'will', 'must',
+  'should', 'when', 'then', 'than', 'into', 'over', 'under', 'about', 'after',
+  'before', 'every', 'never', 'always', 'been', 'being', 'they', 'them', 'these',
+  'those', 'there', 'here', 'what', 'which', 'while', 'because', 'does', 'doing',
+]);
+const MAX_KEYWORDS = 12;
+
+export function extractKeywords(body: string): string[] {
+  const seen = new Set<string>();
+  for (const word of body.toLowerCase().split(/\W+/)) {
+    if (word.length < 4 || STOPWORDS.has(word)) continue;
+    seen.add(word);
+    if (seen.size >= MAX_KEYWORDS) break;
+  }
+  return [...seen];
+}
+
+// Build the memory-map.json index entry for a node (spec section 5.1).
+// Single source of truth for what gets indexed — used by all write paths.
+export function nodeToMapEntry(node: MskNode, file: string): MemoryMapNode {
+  const keywords = extractKeywords(node.body);
+  return {
+    file,
+    layer: node.layer,
+    type: node.type,
+    status: node.status,
+    confidence: node.confidence,
+    dependencies: node.dependencies,
+    ...(node.tags !== undefined ? { tags: node.tags } : {}),
+    ...(node.contradictions.length > 0 ? { contradictions: node.contradictions } : {}),
+    ...(keywords.length > 0 ? { keywords } : {}),
+  };
 }
 
 // Spec section 5.2 — cycle detection via DFS coloring (white/gray/black)

@@ -1,8 +1,9 @@
-import { writeFile, mkdir, readFile, access } from 'node:fs/promises';
+import { mkdir, readFile, access } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import matter from 'gray-matter';
 import { validate } from './validate.js';
 import { readNode } from './read.js';
+import { writeFileAtomic } from './atomic.js';
 import type { MskNode } from './schema.js';
 
 export class MskWriteError extends Error {
@@ -77,7 +78,8 @@ export async function writeNode(filePath: string, node: MskNode): Promise<void> 
     content = serialize(updatedNode);
   }
 
-  await writeFile(filePath, content, 'utf-8');
+  // Spec section 17.1 — node writes are atomic
+  await writeFileAtomic(filePath, content);
 }
 
 // SPEC-GAP: spec does not define a metadata-only update path. This is needed by the
@@ -99,5 +101,5 @@ export async function updateNodeMeta(
   if (!result.valid) {
     throw new MskWriteError(filePath, result.errors);
   }
-  await writeFile(filePath, serialize(updated), 'utf-8');
+  await writeFileAtomic(filePath, serialize(updated));
 }

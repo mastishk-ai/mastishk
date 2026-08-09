@@ -7,8 +7,9 @@ import {
   readMemoryMap,
   writeMemoryMap,
   upsertNode,
+  nodeToMapEntry,
 } from '@mastishk/core';
-import type { MskNode, MskLayer, MskType, MemoryMapNode } from '@mastishk/core';
+import type { MskNode, MskLayer, MskType } from '@mastishk/core';
 import { mastishkDir, memoryMapPath, assertMastishkExists } from '../utils.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -234,16 +235,7 @@ export async function scanCommand(options: ScanOptions = {}): Promise<{ added: s
     await writeNode(filePath, node);
 
     const updatedMap = await readMemoryMap(memoryMapPath(cwd));
-    const entry: MemoryMapNode = {
-      file: relativeFile,
-      layer: node.layer,
-      type: node.type,
-      status: node.status,
-      confidence: node.confidence,
-      dependencies: node.dependencies,
-      tags: node.tags,
-    };
-    await writeMemoryMap(memoryMapPath(cwd), upsertNode(updatedMap, node.id, entry));
+    await writeMemoryMap(memoryMapPath(cwd), upsertNode(updatedMap, node.id, nodeToMapEntry(node, relativeFile)));
 
     console.log(`[${source}] Added ${node.id}`);
     added.push(node.id);

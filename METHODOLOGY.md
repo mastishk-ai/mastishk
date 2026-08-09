@@ -1,11 +1,11 @@
 # METHODOLOGY.md
 # Mastishk Protocol — Methodology and Prior Art Declaration
 
-**Authors:** Mastishk Protocol Contributors  
-**Organisation:** github.com/mastishk  
-**Published:** 2026-05-12  
-**License:** Apache 2.0  
-**Document type:** Defensive publication — prior art establishment  
+**Authors:** Mastishk Protocol Contributors
+**Organisation:** github.com/mastishk-ai
+**Published:** 2026-05-12 · **Revised:** 2026-06-12 (claims 7–9 added)
+**License:** Apache 2.0
+**Document type:** Defensive publication — prior art establishment
 
 ---
 
@@ -15,124 +15,109 @@ This document establishes public, timestamped prior art for the Mastishk protoco
 
 By publishing this document alongside the reference implementation and protocol specification, the authors place all described methodologies in the public domain as prior art. Any patent application filed after this publication date that claims these methodologies as novel would be invalid under prior art doctrine in most jurisdictions.
 
-This document is intended to be submitted to arXiv (cs.AI) and referenced in all subsequent academic and technical publications about Mastishk.
+This document is a prior-art declaration, not a research paper. The empirical research programme — hypotheses, benchmark design, and evaluation — is maintained separately in `docs/RESEARCH.md` and will be published as an empirical paper once experiments are complete.
 
 ---
 
 ## The problem
 
-AI coding agents — Claude Code, Cursor, GitHub Copilot, GPT-based agents — are stateless by default. Each session starts with no memory of prior decisions, architecture choices, errors encountered, or goals set.
+AI coding agents — Claude Code, Cursor, GitHub Copilot, GPT-based agents — are stateless by default. Each session starts with no memory of prior decisions, architecture choices, errors encountered, or goals set. When multiple agents work on the same project, each holds at best a private, vendor-siloed memory invisible to the others.
 
 The current workarounds all fail in predictable ways:
 
-**Flat context injection** — developers manually maintain a `CLAUDE.md` or `RULES.md` file and paste it into every session. This hits token limits quickly, degrades attention as files grow, and goes stale because no agent updates it reliably.
+**Flat context injection** — developers manually maintain a `CLAUDE.md` or `RULES.md` file. This hits token limits, degrades attention as files grow, and goes stale because no agent updates it reliably.
 
-**Vector RAG retrieval** — memory is embedded and retrieved by semantic similarity. This optimises for *proximity*, not *causality*. A goal node and a task node that depends on it may have low cosine similarity but a critical dependency relationship. RAG cannot represent this.
+**Vector RAG retrieval** — memory is embedded and retrieved by semantic similarity. This optimises for *proximity*, not *causality*. A goal node and a task node that depends on it may have low cosine similarity but a critical dependency relationship.
 
-**Proprietary memory layers** — services like Mem0 store memory in their own infrastructure. Memory is tied to one vendor, inaccessible to other agents, and not human-inspectable or git-versionable.
+**Proprietary memory layers** — services like Mem0 store memory in their own infrastructure: tied to one vendor, inaccessible to other agents, not human-inspectable or git-versionable.
 
-**No standard** — there is no open, portable, interoperable format for agent memory. An agent built with one memory system cannot share memory with an agent built on another.
+**No standard, no handoff** — there is no open format for agent memory, and no mechanism by which the understanding one agent builds in a session transfers to the next session or to a different agent.
 
 ---
 
-## The six methodology claims
+## The two core claims
 
-The following six ideas constitute the Mastishk methodology. Each is claimed as prior art as of the publication date of this document.
+The Mastishk methodology reduces to two core claims; the numbered methodology claims below are mechanisms in their service.
+
+**Core claim A — Project-owned shared memory.** Agent memory belongs to the project repository, not to any agent or vendor. All agents read and write the same memory through an explicit session protocol, making multi-agent collaboration a designed behaviour rather than an accident of file co-location.
+
+**Core claim B — Structure-aware context injection.** Context for a task is assembled by traversing a typed dependency graph of memory nodes. Retrieval-by-similarity may select entry points, but causal graph structure — not similarity — determines what context an agent receives.
+
+---
+
+## The nine methodology claims
+
+Each of the following is claimed as prior art as of the publication or revision date of this document.
 
 ### Claim 1 — Three-layer semantic memory architecture
 
 Agent memory is divided into three semantically distinct layers with different persistence, update frequency, and agent trust levels:
 
-- **intent/** — long-term goals and constraints. Set by humans. Rarely changed. Agents must not modify without confirmation.
-- **state/** — current tasks, progress, blockers, outcomes. Changes frequently. Append-only writes.
-- **knowledge/** — architecture decisions, technical facts, learned understanding. Grows over time. Replaceable with newer versions.
+- **intent/** — long-term goals, constraints, and resources. Set by humans. Rarely changed. Agents must not modify without confirmation.
+- **state/** — current tasks, plans, progress, handoffs. Changes every session. Append-only writes.
+- **knowledge/** — architecture decisions, technical facts, learned understanding. Grows over time. Replaceable with newer versions; git history is the version record.
 
-This three-layer separation is the core architectural insight. It mirrors how human teams organise project knowledge — strategy (intent), execution (state), and accumulated learning (knowledge) — and maps naturally to how agents should weight and trust different types of memory.
+This mirrors how human teams organise project knowledge — strategy (intent), execution (state), and accumulated learning (knowledge) — and maps to how agents should weight and trust different types of memory.
 
 ### Claim 2 — DAG traversal for context injection
 
-When an agent needs context for a task, the relevant memory is identified by traversing a directed acyclic graph of dependency-linked memory nodes — not by vector similarity, recency, or keyword search.
-
-The traversal starts from nodes matched to the task description, follows dependency edges outward up to a configurable depth, filters by node status and confidence, and returns a compact, structured context string.
-
-This approach preserves causal structure. If Task A depends on Goal B which is constrained by Constraint C, all three are returned together — because they are causally related to the task, not just semantically similar to it. RAG cannot produce this result reliably because it optimises for proximity in embedding space, not graph reachability.
+When an agent needs context for a task, relevant memory is identified by traversing a directed acyclic graph of dependency-linked memory nodes. Seed selection (matching the task to entry nodes) is pluggable — keyword, BM25, or embedding similarity — but context composition follows dependency edges outward from the seeds, filtered by status and confidence, preserving causal structure: if Task A serves Goal B which is bound by Constraint C, all three are returned together because they are causally related, not because they are semantically similar.
 
 ### Claim 3 — Filesystem-native markdown nodes with YAML frontmatter
 
-Every unit of agent memory is stored as a `.msk.md` file — a markdown file with structured YAML frontmatter containing metadata (id, type, layer, status, confidence, timestamps, dependencies, contradictions) and a markdown body containing the human-readable content.
-
-This format is:
-- **Human-readable and editable** — developers can inspect and modify memory without special tools
-- **Git-versionable** — the entire memory folder can be committed, diffed, branched, and rolled back
-- **Portable** — no database, no binary format, no vendor dependency
-- **Agent-native** — markdown with structured metadata is well within the reasoning capabilities of current LLMs
-
-The `.msk.md` format is the physical manifestation of the protocol. Any tool that reads and writes this format correctly is a compliant Mastishk implementation.
+Every unit of agent memory is a `.msk.md` file — markdown with structured YAML frontmatter (id, type, layer, status, confidence, timestamps, dependencies, contradictions) and a human-readable markdown body. The format is human-editable, git-versionable, portable, and agent-native. Any tool that reads and writes this format correctly is a compliant Mastishk implementation.
 
 ### Claim 4 — Git as episodic memory
 
-The git history of the `.mastishk/` folder is treated as the agent's episodic memory — a timestamped, immutable record of how the project's understanding evolved over time.
+The git history of the `.mastishk/` folder is the project's episodic memory — a timestamped, immutable, content-addressed record of how understanding evolved. Memory checkpoints are git commits; version history of knowledge nodes is git history; the catch-up operation (Claim 8) is computed from this record.
 
-`mastishk checkpoint` commits the current memory state with a structured commit message. The git log of `.mastishk/` is therefore queryable as a timeline of agent cognition: what was known when, what changed, what was decided.
+### Claim 5 — Confidence-weighted nodes with a deterministic conflict Referee
 
-This is not a metaphor. The git object store is a content-addressed, cryptographically verifiable record of every memory state. It is more reliable than any purpose-built episodic memory system.
-
-### Claim 5 — Confidence-weighted nodes with contradiction detection via a Referee layer
-
-Every memory node carries a `confidence` field (0.0–1.0) representing the reliability of its content:
-
-- `1.0` — set by a human explicitly
-- `0.8` — verified by a human after agent creation
-- `0.6` — inferred by an agent from project context (e.g. via `mastishk scan`)
-- `0.3` — unverified, speculative
-
-Before any agent write is committed, a **Referee** layer checks the incoming node against existing nodes in the graph. If the incoming content contradicts an existing node (via explicit `contradictions` references or confidence-weighted semantic comparison), the write is rejected and a conflict issue is created for human resolution.
-
-This prevents the most common failure mode of multi-agent memory systems: silent contradictions where Agent A and Agent B both write conflicting beliefs into the same memory without either knowing.
+Every node carries a `confidence` field (0.0–1.0): 1.0 human-set, 0.8 human-verified, 0.6 agent-inferred, 0.3 unverified. Before any write commits, a **Referee** checks the incoming node against declared `contradictions` references in both directions and applies a configured conflict strategy (flag / require human / accept-latest-and-deprecate), creating a conflict issue node for human resolution. Semantic (model-based) contradiction detection is an optional, pluggable extension of the same Referee interface. This prevents silent contradictions — the central failure mode of multi-agent shared memory.
 
 ### Claim 6 — Ambient memory capture via git hooks and agent tool use
 
-Memory stays current without developer overhead through two ambient mechanisms:
+Memory stays current without depending on developer or agent discipline: a post-commit git hook converts conventional commit messages into state updates and flags codebase-map entries whose files changed as stale; agent tool calls through MCP read and write memory as a natural part of task execution. Memory degrades gracefully rather than going catastrophically stale.
 
-**Post-commit git hooks** — when `mastishk init` is run, a post-commit hook is installed. Every git commit triggers an automatic scan of the commit message and diff, creating or updating memory nodes in `state/` without the developer taking any explicit action. The commit workflow developers already use becomes the memory writing mechanism.
+### Claim 7 — Session protocol for multi-agent shared memory *(added v0.3)*
 
-**Agent tool use via MCP** — when agents call `mastishk_inject`, `mastishk_update`, and `mastishk_log` through the MCP server, memory is read and written as a natural part of the agent's task execution. No human intervention required for routine memory maintenance.
+Agent interaction with shared project memory is governed by an explicit session lifecycle: **session start** registers the agent's presence (agent ID, task, timestamp) in a shared registry and returns catch-up plus task context; **session end** writes a structured handoff and deregisters. Concurrent sessions are visible to each other (presence awareness); crashed sessions expire by timeout. Trust levels per registered agent are enforced at write time (confidence caps, layer restrictions, draft-gating for low-trust writers).
 
-These two mechanisms together mean memory degrades gracefully rather than going catastrophically stale. Even if a developer stops thinking about memory entirely, git commits keep state current and agent tool calls keep knowledge growing.
+### Claim 8 — Catch-up: episodic diff as session onboarding *(added v0.3)*
+
+When an agent begins a session, it receives a compact summary of everything that changed in shared memory since that specific agent's previous session — computed by diffing the memory folder's git history and node timestamps against the agent's recorded last-session time. The catch-up output is ordered: latest handoff, resolved tasks, new issues, changed knowledge, stale map entries, next unblocked plan step. This makes cross-agent and cross-session continuity a single read operation.
+
+### Claim 9 — Codebase map with an ambient staleness contract *(added v0.3)*
+
+A dedicated memory store maps repository files and modules to their purpose, key entry points, and gotchas — eliminating per-session re-exploration of the codebase. Each map node carries the file path it describes; the ambient capture hook marks a map node stale whenever a commit touches its path. Stale entries are visibly flagged in all context output and are never served as authoritative, ensuring agents trust the map only while it is verifiably current.
 
 ---
 
 ## How this differs from prior work
 
-| System | Storage | Structure | Multi-agent | Open protocol |
-|---|---|---|---|---|
-| Mem0 | Hosted vector DB | Flat embeddings | No | No |
-| Graphiti | Graph DB (Neo4j) | Graph | No | No |
-| MemGPT / Letta | In-process | Hierarchical | No | No |
-| LangMem | Vector + SQL | Flat | No | No |
-| agentmemory | Markdown files | Flat | No | No |
-| **Mastishk** | **Filesystem (markdown)** | **DAG (three-layer)** | **Yes** | **Yes** |
+| System | Storage | Structure | Shared across agents | Session/handoff protocol | Open protocol |
+|---|---|---|---|---|---|
+| Mem0 | Hosted vector DB | Flat | No | No | No |
+| Graphiti | Graph DB (Neo4j) | Graph | No | No | No |
+| MemGPT / Letta | In-process | Hierarchical | No | No | No |
+| LangMem | Vector + SQL | Flat | No | No | No |
+| agentmemory | Markdown files | Flat | No | No | No |
+| **Mastishk** | **Filesystem (markdown)** | **Typed DAG, 3 layers + map** | **Yes** | **Yes** | **Yes** |
+
+*Characterisations reflect publicly documented capabilities as of mid-2026.*
 
 The key differences:
 
-1. **Filesystem-native** — no database of any kind as primary storage. The files ARE the memory.
-2. **Protocol-first** — Mastishk is a specification, not just a library. Any implementation in any language that passes the compliance suite is Mastishk-compliant.
-3. **Multi-agent by design** — the memory folder belongs to the project, not to any agent. All agents read and write the same folder. Conflict resolution is built into the protocol.
-4. **Open and portable** — Apache 2.0 licensed, no vendor dependency, runs on any filesystem.
+1. **Filesystem-native** — no database as primary storage. The files ARE the memory.
+2. **Protocol-first** — a specification with a compliance suite; any implementation in any language can be compliant.
+3. **Multi-agent by design** — sessions, presence, catch-up, handoff, and conflict resolution are protocol-level constructs, not conventions.
+4. **Open and portable** — Apache 2.0, no vendor dependency, runs on any filesystem.
 
 ---
 
-## Research claims suitable for empirical validation
+## Empirical validation
 
-The following claims are testable and intended to be validated in the accompanying research paper:
-
-**Hypothesis 1 — Task continuity** — an agent using Mastishk memory completes a multi-session coding task in fewer sessions and with fewer contradictions than an agent using flat context injection or no memory.
-
-**Hypothesis 2 — Context efficiency** — `mastishk inject` delivers equivalent or better task performance at significantly lower token cost than full context injection, by traversing only the causally relevant subgraph.
-
-**Hypothesis 3 — Contradiction reduction** — the Referee layer reduces the rate at which agents produce outputs that contradict prior decisions, compared to agents operating without structured memory.
-
-These hypotheses are testable using the Claude API with reproducible task sets. The experimental methodology will be published alongside the reference implementation.
+The research programme validating these claims — including the multi-session, multi-agent **relay benchmark** (task continuity across agent handoffs), exploration-token-cost measurements for the codebase map, and ablations of individual mechanisms — is specified in `docs/RESEARCH.md`. Results will be published as a separate empirical paper; this document's purpose is limited to establishing the methodology as prior art.
 
 ---
 
@@ -140,7 +125,7 @@ These hypotheses are testable using the Claude API with reproducible task sets. 
 
 This document is published simultaneously at:
 
-- GitHub: `github.com/mastishk/mastishk` (commit timestamp)
+- GitHub: `github.com/mastishk-ai/mastishk` (commit timestamps for v1.0 and each revision)
 - arXiv: cs.AI submission (pending — submission date establishes timestamp)
 
 The combination of a public GitHub commit and an arXiv submission creates a robust, independently verifiable prior art record with dual timestamps from two trusted, permanently archived sources.
@@ -158,7 +143,7 @@ Any entity that initiates patent litigation against a Mastishk user or contribut
 ## How to cite this document
 
 ```
-Mastishk Protocol Contributors. (2026). Mastishk: A Sanskrit-Rooted Open Protocol
-for Structured, Persistent, Filesystem-Native Memory in AI Coding Agents.
-github.com/mastishk/mastishk. arXiv:XXXX.XXXXX [cs.AI].
+Mastishk Protocol Contributors. (2026). Mastishk: An Open Protocol for Structured,
+Persistent, Filesystem-Native Shared Memory in AI Coding Agents.
+github.com/mastishk-ai/mastishk. arXiv:XXXX.XXXXX [cs.AI].
 ```

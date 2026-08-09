@@ -7,7 +7,7 @@ confidence: 1.0
 created_by: claude-code
 created_at: 2026-05-12T00:00:00Z
 last_updated_by: claude-code
-last_updated_at: 2026-05-12T00:00:00Z
+last_updated_at: 2026-08-10T00:00:00Z
 dependencies: []
 contradictions: []
 tags: [phase-1, core, schema, validate]
@@ -19,6 +19,60 @@ Phase 4 — @mastishk/mcp: MCP server, 5 tools (inject, update, log, status, che
 Phase 5 — @mastishk/cli: scan command — COMPLETE.
 Phase 6 — tests/compliance/: full compliance suite — COMPLETE.
 Phase 7 — npm publish prep + arXiv paper + mastishk.dev — COMPLETE (human publish actions pending).
+
+### 2026-08-10T00:00:00Z — claude-code
+
+Phase 10 COMPLETE — v0.3 session protocol. Verified clause-by-clause against spec §15 before
+recording (not inferred from a green test run). Delivered in @mastishk/core: session.ts
+(presence registry at sessions/active.json, §15.3 stale expiry via session_timeout_hours,
+sessionStart = read + register only, sessionEnd = handoff node + last_session_at + deregister),
+catchup.ts (§15.4 six-section ordered diff, 2000-char cap, findNextPlanStep). In @mastishk/cli:
+session-cmd.ts (presence warning, TTY four-part handoff prompt, checkpoint that degrades
+gracefully outside git), catchup-cmd.ts. Inject already renders the handoff section first (§6.4)
+and marks stale map entries.
+468 tests green (25 files, incl. compliance 09-sessions with 13 tests), typecheck clean,
+core/cli/mcp all build.
+SPEC-GAP recorded in catchup.ts: §15.4 specifies the diff is computed from git history of
+.mastishk/ AND node timestamps; this implementation uses timestamps only. Timestamps answer
+every ordered section and keep catchup working in an uncommitted memory folder. Git history
+would add deleted-node detection and per-commit attribution — revisit if either becomes
+load-bearing.
+Also corrected claims that had drifted ahead of code: spec §15 and the §4.2 handoff paragraph
+no longer carry "not yet in reference implementation"; README 🚧 removed from session/catchup/
+handoff/sessions-dir; README 🚧 ADDED to AGENTS.md claims, which were false — init writes
+CLAUDE.md only, AGENTS.md is Phase 12.
+Phase 9 + 10 committed together — both had been sitting uncommitted since 2026-06-12.
+Next: Phase 11 (map layer, scan→map nodes, hook staleness flagging, plan nodes, next, doctor).
+
+### 2026-06-12T15:30:00Z — claude-code
+
+Phase 9 COMPLETE — v0.3 core implemented with tests. See task-v03-implementation for detail.
+Environment: Node 24 LTS installed (issue-npm-not-on-path resolved). 430 tests green,
+typecheck clean, core/cli/mcp build. Spec §17 marker removed (now implemented).
+The Referee is no longer a paper claim — it rejects contradicting writes, creates conflict
+issue nodes, and honours flag/human/latest strategies, with compliance coverage.
+
+### 2026-06-12T10:00:00Z — claude-code
+
+Phase 8 COMPLETE — project restructured around the shared-memory session protocol (spec v0.3).
+Strategic redesign from this session's discussion: pitch shifted from "a folder of markdown memory"
+to "a session protocol for multi-agent collaboration" (check in → catch up → work → hand off);
+six claims reframed as two core claims + nine mechanisms; research repositioned as benchmark-first.
+Files created/modified (docs only — no src/ changes, see open issue on npm):
+- MASTISHK-SPEC.md — rewritten as v0.3: session protocol (§15), catchup, handoff + plan node types,
+  map/ codebase store with staleness contract (§4.4), resource type, deterministic Referee core +
+  optional semantic extension (§8.3), concurrency + trust enforcement (§17), AGENTS.md canonical
+  onboarding (§14), pluggable inject seeding + character budget (§6), testable ID uniqueness,
+  knowledge history = git history. New sections marked "not yet in reference implementation".
+- README.md — rewritten around session-protocol pitch, two core claims, honest 🚧 markers,
+  catchup demo, comparison table softened + dated.
+- METHODOLOGY.md — claims 7 (session protocol), 8 (catchup/episodic diff), 9 (codebase map +
+  staleness) added as prior art; research content moved out to docs/RESEARCH.md.
+- docs/RESEARCH.md — NEW: RelayBench design (multi-session multi-agent relay benchmark),
+  4 conditions (no memory / flat file / RAG / Mastishk), 7 ablations, experiment sequence E0–E4.
+- CLAUDE.md — two-claims framing, corrected source paths (src/packages/), new commands,
+  phases 8–14 added to tracker, "claims must match code" rule added.
+Next: Phase 9 (v0.3 core: schema, Referee, atomic writes, trust) — BLOCKED on npm availability.
 
 ### 2026-05-12T04:00:00.000Z — claude-code
 

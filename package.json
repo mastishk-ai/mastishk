@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "author": "Mastishk Protocol Contributors",
   "private": true,
+  "type": "module",
   "workspaces": [
     "src/packages/*"
   ],

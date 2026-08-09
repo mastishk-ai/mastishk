@@ -16,6 +16,22 @@
   citecolor=blue
 }
 
+% `listings` ships no yaml/json definitions — define them so the code blocks
+% below highlight instead of aborting the build.
+\lstdefinelanguage{yaml}{
+  keywords={true,false,null,yes,no},
+  sensitive=false,
+  comment=[l]{\#},
+  morestring=[b]",
+  morestring=[b]'
+}
+
+\lstdefinelanguage{json}{
+  keywords={true,false,null},
+  sensitive=false,
+  morestring=[b]"
+}
+
 \lstset{
   basicstyle=\ttfamily\small,
   breaklines=true,

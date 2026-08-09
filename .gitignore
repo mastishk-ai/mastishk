@@ -6,3 +6,10 @@ dist/
 .DS_Store
 coverage/
 *.tsbuildinfo
+
+# LaTeX build artifacts (docs/paper.pdf itself is tracked)
+*.aux
+*.fdb_latexmk
+*.fls
+*.out
+docs/*.log

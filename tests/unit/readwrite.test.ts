@@ -84,12 +84,12 @@ describe('round-trip: write then read', () => {
   it('preserves dependencies and contradictions arrays', async () => {
     const node: MskNode = {
       ...baseNode,
-      id: 'task-with-deps',
-      type: 'task',
+      id: 'goal-with-deps',
+      type: 'goal',
       dependencies: ['goal-launch-v1', 'fact-tech-stack'],
       contradictions: ['decision-old-arch'],
     };
-    const filePath = join(tmpDir, 'intent', 'task-with-deps.msk.md');
+    const filePath = join(tmpDir, 'intent', 'goal-with-deps.msk.md');
     await writeNode(filePath, node);
     const read = await readNode(filePath);
     expect(read.dependencies).toEqual(['goal-launch-v1', 'fact-tech-stack']);
