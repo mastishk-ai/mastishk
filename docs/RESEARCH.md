@@ -95,7 +95,7 @@ Negative results are publishable and expected for some rows; honesty about which
 
 ## 4. Experiment sequence (cheapest first)
 
-1. **E0 — Exploration-token pilot (days, not weeks).** One repo, 3 legs, C0 vs C3-with-map only, measuring exploration tokens. Validates instrumentation and gives the first headline number before committing to the full grid.
+1. **E0 — Exploration-token pilot (days, not weeks).** One repo, 3 legs, C0 vs C3-with-map only, measuring exploration tokens. Validates instrumentation and gives the first headline number before committing to the full grid. **Pre-registration drafted: [E0-PROTOCOL.md](E0-PROTOCOL.md)** — awaiting decisions on harness, model/budget, and repository before it can be locked and run.
 2. **E1 — Single-repo full grid.** All conditions and both relay variants on one repository. Validates the harness, surfaces design flaws in legs/metrics.
 3. **E2 — Full RelayBench.** All repos, conditions, variants, n ≥ 3.
 4. **E3 — Ablations.** A1–A7 on the two repos with the largest C3-vs-C1 effect.

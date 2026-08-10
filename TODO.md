@@ -173,8 +173,12 @@ Two follow-ups worth doing:
 
 Per `docs/RESEARCH.md`. **Nothing here exists yet, and nothing publishable exists until it does.**
 
-- [ ] **E0 pilot** — exploration-token measurement on one repo. Cheapest possible signal
-      that the core effect is real. Do this before building the full harness.
+- [x] **E0 pre-registration drafted** — [docs/E0-PROTOCOL.md](docs/E0-PROTOCOL.md). Hypothesis,
+      legs, metric definition, registered prediction, falsification criteria and analysis plan
+      are all fixed before any data. Five decisions still need your input (§9): agent harness,
+      model + budget, repository choice, who writes the legs, and whether to submit it as a
+      registered report first.
+- [ ] **Lock E0** — answer §9, write the answers into the protocol, then run it
 - [ ] Harness: multi-session, multi-agent relay execution
 - [ ] 4 conditions: no memory / flat file / RAG / Mastishk
 - [ ] 7 ablations (isolates *which* mechanism pays — reviewers will demand this)
