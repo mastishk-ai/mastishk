@@ -205,8 +205,16 @@ const SOURCE_EXTENSIONS = new Set([
 ]);
 
 const SKIP_DIRS = new Set([
+  // build output and dependencies
   'node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt',
   'vendor', '__pycache__', '.venv', 'venv', 'target', '.mastishk', '.cache',
+  // Not the codebase's substance. An agent asking "which file does what" wants
+  // the code under maintenance, not the suite that exercises it or the samples
+  // that document it. Mapping these buries the useful entries: on a real repo
+  // (sindresorhus/got) they were 15 of 40 entries.
+  'test', 'tests', '__tests__', 'spec', 'e2e', 'fixtures', '__fixtures__',
+  'benchmark', 'benchmarks', 'bench',
+  'example', 'examples', 'docs', 'documentation',
 ]);
 
 // Test files describe the code under test, not the codebase itself.
@@ -272,17 +280,30 @@ export function summariseSourceFile(relPath: string, content: string): string {
     return commentLines.join(' ').slice(0, 240);
   }
 
-  // Fall back to exported/declared names
-  const exports = new Set<string>();
+  // Fall back to the file's public surface. Explicit exports are the strongest
+  // signal, so look for those first and only report them as "Exports".
+  const exported = new Set<string>();
   for (const line of lines) {
-    const m =
-      /^export\s+(?:async\s+)?(?:function|class|const|interface|type|enum)\s+([A-Za-z0-9_$]+)/.exec(line) ??
-      /^(?:public\s+)?(?:class|def|func|fn|type)\s+([A-Za-z0-9_$]+)/.exec(line.trim());
-    if (m?.[1]) exports.add(m[1]);
-    if (exports.size >= 8) break;
+    const m = /^export\s+(?:async\s+)?(?:function|class|const|interface|type|enum)\s+([A-Za-z0-9_$]+)/.exec(line);
+    if (m?.[1]) exported.add(m[1]);
+    if (exported.size >= 8) break;
   }
-  if (exports.size > 0) {
-    return `Exports: ${[...exports].join(', ')}.`;
+  if (exported.size > 0) {
+    return `Exports: ${[...exported].join(', ')}.`;
+  }
+
+  // Languages without an export keyword (Python, Go, Rust) put their API at the
+  // top level. Report those as "Defines" — calling them exports would be a lie,
+  // and a map entry that lies is worse than no entry at all. `type` is excluded
+  // deliberately: a local generic helper is not the file's purpose.
+  const defined = new Set<string>();
+  for (const line of lines) {
+    const m = /^(?:public\s+)?(?:class|def|func|fn)\s+([A-Za-z0-9_$]+)/.exec(line);
+    if (m?.[1]) defined.add(m[1]);
+    if (defined.size >= 8) break;
+  }
+  if (defined.size > 0) {
+    return `Defines: ${[...defined].join(', ')}.`;
   }
 
   return `Source file ${basename(relPath)}. Purpose not inferred — refine this entry.`;

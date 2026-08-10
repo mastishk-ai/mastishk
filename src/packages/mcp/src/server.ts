@@ -3,6 +3,9 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
   TOOL_DEFINITIONS,
   toolInject,
@@ -15,11 +18,26 @@ import {
   toolCatchup,
 } from './tools.js';
 
+// The version reported in the MCP handshake. Read from package.json so it cannot
+// drift from what was actually published (dist/server.js sits one level below the
+// package root).
+function packageVersion(): string {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf-8')) as {
+      version?: string;
+    };
+    return pkg.version ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 export function createMastishkServer(mastishkDir: string): Server {
   const ctx = { mastishkDir };
 
   const server = new Server(
-    { name: 'mastishk', version: '0.0.1' },
+    { name: 'mastishk', version: packageVersion() },
     { capabilities: { tools: {} } }
   );
 

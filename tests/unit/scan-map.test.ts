@@ -63,6 +63,23 @@ describe('summariseSourceFile — spec section 11', () => {
     expect(s).toContain('signToken');
   });
 
+  it('does not report a non-exported local type as an export', () => {
+    // Found on sindresorhus/got: a local `type Returns<...>` helper was being
+    // reported as "Exports: Returns", which is simply false.
+    const s = summariseSourceFile(
+      'src/retry.ts',
+      "import type {RetryFunction} from './options.js';\n\ntype Returns<T, V> = (...a: any) => V;\n\nconst calculateRetryDelay = () => {};\n"
+    );
+    expect(s).not.toContain('Returns');
+    expect(s).toContain('Purpose not inferred');
+  });
+
+  it('reports top-level definitions in export-less languages as "Defines"', () => {
+    const s = summariseSourceFile('src/hash.py', 'import os\n\ndef hash_pw(pw):\n    pass\n');
+    expect(s).toContain('Defines:');
+    expect(s).toContain('hash_pw');
+  });
+
   it('says so honestly when nothing can be inferred', () => {
     const s = summariseSourceFile('src/mystery.ts', 'const a = 1;\n');
     expect(s).toContain('Purpose not inferred');
@@ -96,6 +113,20 @@ describe('scan → map nodes — spec section 11', () => {
   it('skips node_modules, dist, and .git', async () => {
     await writeSource('node_modules/pkg/index.js', 'module.exports = {};');
     await writeSource('dist/bundle.js', 'var a=1;');
+    await writeSource('src/real.ts', '// Real code.\nexport const x = 1;');
+
+    const paths = (await scanInfer(tmpDir))
+      .filter((c) => c.node.layer === 'map')
+      .map((c) => c.node.path);
+    expect(paths).toEqual(['src/real.ts']);
+  });
+
+  it('skips test, benchmark, example and docs directories', async () => {
+    // On sindresorhus/got these were 15 of 40 map entries, burying the real ones.
+    await writeSource('test/cookies.ts', '// Cookie tests.\nexport const t = 1;');
+    await writeSource('benchmark/index.ts', '// Benchmarks.\nexport const b = 1;');
+    await writeSource('documentation/examples/pagination.js', '// Example.\nexport const e = 1;');
+    await writeSource('docs/sample.ts', '// Doc sample.\nexport const d = 1;');
     await writeSource('src/real.ts', '// Real code.\nexport const x = 1;');
 
     const paths = (await scanInfer(tmpDir))

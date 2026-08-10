@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { program } from 'commander';
 import { initCommand } from './commands/init.js';
 import { injectCommand } from './commands/inject-cmd.js';
@@ -16,10 +19,26 @@ import { mapCommand } from './commands/map-cmd.js';
 import { nextCommand } from './commands/next-cmd.js';
 import { doctorCommand } from './commands/doctor-cmd.js';
 
+// Read the version from package.json rather than hardcoding it — a hardcoded
+// string drifts silently, and `mastishk --version` reporting the wrong number is
+// the one thing a user checks when a release does not behave as expected.
+// dist/bin.js sits one level below the package root.
+function packageVersion(): string {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf-8')) as {
+      version?: string;
+    };
+    return pkg.version ?? 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 program
   .name('mastishk')
   .description('Persistent structured memory for AI coding agents.')
-  .version('0.0.1');
+  .version(packageVersion());
 
 // Spec section 10: mastishk init [--template <name>]
 program

@@ -50,3 +50,24 @@ Still open after publishing:
   init detects a local dev install.
 - Consider a test that runs the installed binary end to end, so the next packaging regression
   is caught by CI rather than by hand.
+
+### Follow-up 2026-08-11 — verified via a real install, plus three more packaging bugs
+
+The install path is now proven without publishing: packed all three tarballs, installed them
+into a clean repo, and ran the packaged binary. `mastishk init` wrote its usual
+`npx @mastishk/cli hook` hook, and on the next commit the hook FIRED and flagged the map entry
+stale — npx resolves the local node_modules install ahead of the registry. So the shipped code
+is correct; only the registry copy is stale. Publishing 0.3.0 closes it.
+
+Three further packaging bugs found the same way, none of which any test would have caught:
+1. `mastishk --version` reported a hardcoded `0.0.1`, as did the MCP handshake. Both now read
+   the real version from package.json.
+2. `@mastishk/core` and `@mastishk/mcp` listed `types` AFTER `import` in their exports map.
+   TypeScript takes the first matching condition, so node16/bundler consumers could miss the
+   declarations entirely.
+3. Neither had a `default` condition, so `require('@mastishk/core')` failed with
+   ERR_PACKAGE_PATH_NOT_EXPORTED. Found when the testbed harness tried exactly that.
+
+All three are fixed and covered by tests/unit/packaging.test.ts, which asserts version
+consistency, the core pin matching across packages, prepublishOnly, exports ordering, and that
+the published READMEs document every command and tool that actually exists.
