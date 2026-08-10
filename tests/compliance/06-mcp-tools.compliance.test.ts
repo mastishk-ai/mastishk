@@ -282,6 +282,81 @@ describe('section 10 — toolUpdate handler', () => {
     expect(node.type).toBe('task');
   });
 
+  // Spec 4.4 — map nodes are "refined by agents during sessions", so the MCP
+  // write path must be able to create and refresh them. Without this an agent
+  // can read a stale map entry but never fix it.
+  it('creates a map node with type=file when given a path', async () => {
+    const result = await toolUpdate(
+      { id: 'map-auth', content: 'Signs and verifies JWTs.', layer: 'map', path: 'src/auth.ts' },
+      ctx
+    );
+    expect(result).toContain('Created');
+
+    const { readNode } = await import('@mastishk/core');
+    const node = await readNode(join(ctx.mastishkDir, 'map', 'map-auth.msk.md'));
+    expect(node.type).toBe('file');
+    expect(node.path).toBe('src/auth.ts');
+    expect(node.stale).toBe(false);
+  });
+
+  it('refuses to create a map node without a path, with an actionable message', async () => {
+    const result = await toolUpdate(
+      { id: 'map-nopath', content: 'Something.', layer: 'map' },
+      ctx
+    );
+    expect(result).toContain('path');
+    // The refusal must not leave a half-created node behind
+    const { readMemoryMap } = await import('@mastishk/core');
+    const map = await readMemoryMap(join(ctx.mastishkDir, 'memory-map.json'));
+    expect(map.nodes['map-nopath']).toBeUndefined();
+  });
+
+  it('rewriting a stale map node clears the stale flag (the 4.4 refresh cycle)', async () => {
+    await toolUpdate(
+      { id: 'map-auth', content: 'Signs JWTs.', layer: 'map', path: 'src/auth.ts' },
+      ctx
+    );
+    const { markStaleByPaths, readNode, readMemoryMap } = await import('@mastishk/core');
+    await markStaleByPaths(ctx.mastishkDir, ['src/auth.ts']);
+    expect((await readNode(join(ctx.mastishkDir, 'map', 'map-auth.msk.md'))).stale).toBe(true);
+
+    const result = await toolUpdate(
+      { id: 'map-auth', content: 'Signs and rotates JWTs. Verified against the code.', layer: 'map' },
+      ctx
+    );
+    expect(result).toContain('Updated');
+
+    const node = await readNode(join(ctx.mastishkDir, 'map', 'map-auth.msk.md'));
+    expect(node.stale).toBe(false);
+    expect(node.verified).toBe(true);
+    expect(node.body).toContain('rotates');
+
+    // The index must agree with the node file, or `map --stale` keeps lying
+    const map = await readMemoryMap(join(ctx.mastishkDir, 'memory-map.json'));
+    expect(map.nodes['map-auth']!.stale).toBe(false);
+  });
+
+  it('rewriting a map node can move the path it describes', async () => {
+    await toolUpdate(
+      { id: 'map-auth', content: 'Auth.', layer: 'map', path: 'src/auth.ts' },
+      ctx
+    );
+    await toolUpdate(
+      { id: 'map-auth', content: 'Auth, moved.', layer: 'map', path: 'src/auth/index.ts' },
+      ctx
+    );
+    const { readNode } = await import('@mastishk/core');
+    const node = await readNode(join(ctx.mastishkDir, 'map', 'map-auth.msk.md'));
+    expect(node.path).toBe('src/auth/index.ts');
+  });
+
+  it('the update tool advertises the map layer and the path parameter', () => {
+    const t = TOOL_DEFINITIONS.find((t) => t.name === 'mastishk_update')!;
+    const layer = t.inputSchema.properties.layer as { enum?: readonly string[] };
+    expect(layer.enum).toContain('map');
+    expect(Object.keys(t.inputSchema.properties)).toContain('path');
+  });
+
   it('infers type=issue for issues layer', async () => {
     await toolUpdate({ id: 'issue-test', content: 'Issue body.', layer: 'issues' }, ctx);
     const { readNode } = await import('@mastishk/core');
