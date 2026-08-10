@@ -1,11 +1,10 @@
-// SPEC-GAP: instruct command not in spec — proposed as spec section 11
-// Generates agent-specific briefings and writes agent configs so any supported
-// coding agent can immediately access project memory via Mastishk.
+// The instruct interface is specified in v0.3 section 12. Onboarding-file rules
+// are section 14.
 import { readFile, writeFile, mkdir, access, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { inject, readNode, readMemoryMap } from '@mastishk/core';
 import { mastishkDir, memoryMapPath, assertMastishkExists } from '../utils.js';
-import { CLAUDE_MD_SECTION, injectClaudeMd } from './init.js';
+import { injectAllBriefings } from './onboarding.js';
 
 export type AgentName = 'claude-code' | 'cursor' | 'windsurf' | 'api';
 
@@ -122,28 +121,19 @@ function printMemorySummary(summary: MemorySummary): void {
   This agent now has the same memory as every other agent on this project.`);
 }
 
+// Spec section 14.2 — unlike init, instruct MAY replace an existing Mastishk
+// section with the current canonical format. That is the point of re-running it:
+// an older briefing (say, one that still tells agents to run `mastishk inject`
+// instead of `session start`) gets brought up to date.
 async function handleClaudeCode(cwd: string): Promise<void> {
-  // Update existing block or append — injectClaudeMd handles both
-  const claudeMdPath = join(cwd, 'CLAUDE.md');
-  let updated = false;
-  try {
-    const existing = await readFile(claudeMdPath, 'utf-8');
-    if (existing.includes('## Mastishk memory')) {
-      // Replace existing block
-      const before = existing.slice(0, existing.indexOf('## Mastishk memory'));
-      await writeFile(claudeMdPath, before + CLAUDE_MD_SECTION.trimStart(), 'utf-8');
-      updated = true;
-    } else {
-      updated = await injectClaudeMd(cwd);
-    }
-  } catch {
-    updated = await injectClaudeMd(cwd);
+  const results = await injectAllBriefings(cwd, { replace: true });
+
+  for (const { file, outcome } of results) {
+    if (outcome === 'created') console.log(`✅ Created ${file} with the Mastishk briefing.`);
+    else if (outcome === 'appended') console.log(`✅ Added the Mastishk briefing to ${file}.`);
+    else if (outcome === 'replaced') console.log(`✅ Refreshed the Mastishk briefing in ${file}.`);
   }
-  if (updated) {
-    console.log('✅ CLAUDE.md updated. Open Claude Code — it has full memory.');
-  } else {
-    console.log('ℹ️  CLAUDE.md already has Mastishk section — no changes needed.');
-  }
+  console.log('Open Claude Code — it has full memory.');
 }
 
 async function handleMcpAgent(

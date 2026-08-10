@@ -10,6 +10,9 @@ import {
   toolLog,
   toolStatus,
   toolCheckpoint,
+  toolSessionStart,
+  toolSessionEnd,
+  toolCatchup,
 } from './tools.js';
 
 export function createMastishkServer(mastishkDir: string): Server {
@@ -20,7 +23,7 @@ export function createMastishkServer(mastishkDir: string): Server {
     { capabilities: { tools: {} } }
   );
 
-  // Spec section 9: list all five required tools
+  // Spec section 10: list all eight required tools
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: TOOL_DEFINITIONS as unknown as typeof TOOL_DEFINITIONS[number][],
   }));
@@ -45,6 +48,16 @@ export function createMastishkServer(mastishkDir: string): Server {
           break;
         case 'mastishk_checkpoint':
           text = await toolCheckpoint(args as { message?: string }, ctx);
+          break;
+        // Spec section 15 — the session protocol over MCP
+        case 'mastishk_session_start':
+          text = await toolSessionStart(args as { agent: string; task: string }, ctx);
+          break;
+        case 'mastishk_session_end':
+          text = await toolSessionEnd(args as { handoff: string; agent?: string }, ctx);
+          break;
+        case 'mastishk_catchup':
+          text = await toolCatchup(args as { agent: string }, ctx);
           break;
         default:
           throw new Error(`Unknown tool: ${name}`);

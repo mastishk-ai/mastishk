@@ -36,7 +36,7 @@ describe('init — creates all required files', () => {
     await initCommand({ cwd: tmpDir, skipPrompt: true });
     const content = await readFile(join(tmpDir, 'CLAUDE.md'), 'utf-8');
     expect(content).toContain('## Mastishk memory');
-    expect(content).toContain('mastishk inject');
+    expect(content).toContain('mastishk session start');
   });
 });
 

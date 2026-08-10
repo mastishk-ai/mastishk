@@ -8,15 +8,18 @@
 **License:** Apache 2.0
 **Status:** Draft — seeking community review
 
-> **Implementation status:** the reference TypeScript implementation covers v0.2
-> behaviour plus the v0.3 write path (section 8.3 Referee, section 17 concurrency
-> and trust), the v0.3 session protocol (section 15, including catchup and handoff
-> nodes), and the v0.3 codebase map with its staleness contract (sections 4.4 and
-> 16.1, plus `next`, `map` and `doctor` in section 11). The remaining v0.3 gaps are
-> AGENTS.md as the canonical onboarding file (section 14) and the three v0.3 MCP
-> tools (section 10); both are marked **[v0.3 — not yet in reference
-> implementation]** and tracked in the build phase table in `CLAUDE.md`. A section
-> without that marker is implemented and covered by the compliance suite.
+> **Implementation status:** the reference TypeScript implementation covers all of
+> v0.2 and v0.3 — the write path (section 8.3 Referee, section 17 concurrency and
+> trust), the session protocol (section 15, including catchup and handoff nodes),
+> the codebase map and its staleness contract (sections 4.4 and 16.1, plus `next`,
+> `map` and `doctor` in section 11), AGENTS.md canonical onboarding (section 14),
+> and the eight MCP tools (section 10). Every normative section is implemented and
+> covered by the compliance suite at `tests/compliance/`.
+>
+> One known deviation is recorded: section 15.4 specifies the catchup diff as
+> computed from the git history of `.mastishk/` *and* node timestamps; the
+> reference implementation uses node timestamps only. See the `SPEC-GAP` note in
+> `catchup.ts`.
 
 ---
 
@@ -424,10 +427,6 @@ A Mastishk MCP server MUST expose the following tools. Tool descriptions are par
 
 When the MCP server is running, it SHOULD act as the single writer for the memory folder (section 16.2).
 
-> **[v0.3 — not yet in reference implementation]** The three session tools
-> (`mastishk_session_start`, `mastishk_session_end`, `mastishk_catchup`) are
-> specified but not yet exposed by the reference MCP server; the underlying
-> operations are available through the CLI. Tracked as build phase 12.
 
 ---
 
@@ -555,10 +554,6 @@ All created nodes MUST be registered in `memory-map.json`.
 When Mastishk is initialised, it injects a workflow briefing into the project's agent instruction files so that any agent opening the project discovers the shared memory without configuration. **`AGENTS.md` is the canonical location** (the cross-agent instruction file adopted by the wider ecosystem); `CLAUDE.md` receives a mirror of the same section for Claude Code.
 
 ### 14.2 Detection and injection rules
-
-> **[v0.3 — not yet in reference implementation]** The reference implementation
-> currently writes `CLAUDE.md` only. Making `AGENTS.md` the canonical target is
-> tracked as build phase 12.
 
 For each of `AGENTS.md` and `CLAUDE.md`, a compliant implementation MUST:
 
@@ -708,7 +703,8 @@ The compliance suite tests:
 - Graph constraints (section 5)
 - Inject output format and budget (section 6)
 - Write-back contract, append-only behaviour, and the deterministic Referee (section 8)
-- MCP tool presence and description format (section 10)
+- MCP tool presence, description format, and session tool behaviour (section 10)
+- Agent onboarding: AGENTS.md canonical, CLAUDE.md mirror, injection rules (section 14)
 - CLI command availability, `next` plan-step selection, and `doctor` findings (section 11)
 - Session lifecycle and catchup output ordering (section 15)
 - Ambient capture including map staleness flagging (section 16)
@@ -727,3 +723,4 @@ Implementations in any language that pass the compliance suite MAY list themselv
 | 0.3 | 2026-06-12 | Restructured around two core claims (project-owned shared memory; structure-aware injection). Added: session protocol (§15 — session start/end, presence, stale sessions, catchup), handoff and plan node types (§4.2), `map/` codebase map store with staleness contract (§4.4), `resource` node type (§4.1), concurrency and trust enforcement (§17), `mastishk next`/`doctor`/`catchup`/`session`/`map` CLI commands (§11), three new MCP tools (§10), AGENTS.md as canonical onboarding file (§14). Referee redefined with a mandatory deterministic core and optional semantic extension (§8.3). Inject seeding made pluggable, budget redefined in characters, handoff surfaced first (§6). Knowledge version history defined as git history (§4.3). ID uniqueness defined testably (§3.1). Fixed stale `cmg scan` reference and org name. |
 | 0.3 | 2026-08-10 | No normative change. Implementation-status update: §8.3 (Referee), §17 (concurrency and trust) and §15 (session protocol, incl. catchup and handoff nodes) are now implemented and covered by compliance suites 08 and 09; their "not yet in reference implementation" markers are removed. Still unimplemented: §4.4 `map/` staleness, plan nodes, `next`, `doctor` (§11), AGENTS.md canonical onboarding (§14), the three v0.3 MCP tools (§10). Known deviation: §15.4 catchup is computed from node timestamps only, not git history — recorded as a SPEC-GAP in `catchup.ts`. |
 | 0.3 | 2026-08-10 | No normative change. Implementation-status update: §4.4 (`map/` store and staleness contract), §16.1 step 4 (commit-driven staleness flagging), and §11 `next` / `map` / `doctor` are now implemented and covered by compliance suites 10 and 11. `memory-map.json` entries gained cached `path` and `stale` fields so ambient capture can match changed paths without opening every node file (§5.1 — additive, existing indexes remain valid). Remaining v0.3 gaps: AGENTS.md canonical onboarding (§14.2) and the three session MCP tools (§10), both now explicitly marked. |
+| 0.3 | 2026-08-10 | No normative change. Implementation-status update: §14 (AGENTS.md canonical, CLAUDE.md mirror) and the three §10 session MCP tools (`mastishk_session_start`, `mastishk_session_end`, `mastishk_catchup`) are implemented, with compliance suites 12 and an extended 06. **v0.3 is now fully implemented in the reference implementation**; the only recorded deviation is the §15.4 catchup source. Behaviour change from v0.2: the onboarding briefing now instructs agents to run `mastishk session start` rather than `mastishk inject`, and `mastishk_update` accepts the `map` layer with a `path` parameter (rewriting a map node clears its stale flag, per §4.4). |

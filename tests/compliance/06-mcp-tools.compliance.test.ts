@@ -1,7 +1,7 @@
 /**
- * Compliance suite — Section 9: MCP tool interface
+ * Compliance suite — Section 10: MCP tool interface
  *
- * Tests that the MCP server exposes exactly the five required tools with:
+ * Tests that the MCP server exposes exactly the eight required tools with:
  * - Correct names
  * - Non-trivial descriptions (first-time agent discovery)
  * - Correct required parameter lists
@@ -18,7 +18,11 @@ import {
   toolLog,
   toolStatus,
   toolCheckpoint,
+  toolSessionStart,
+  toolSessionEnd,
+  toolCatchup,
 } from '../../src/packages/mcp/src/tools.js';
+import { readActiveSessions } from '@mastishk/core';
 import { initCommand } from '../../src/packages/cli/src/commands/init.js';
 
 let tmpDir: string;
@@ -32,20 +36,25 @@ beforeEach(async () => {
 afterEach(async () => { await rm(tmpDir, { recursive: true, force: true }); });
 
 // ---------------------------------------------------------------------------
-// Section 9 — Tool presence and names
+// Section 10 — Tool presence and names
 // ---------------------------------------------------------------------------
 
-describe('section 9 — required tool names', () => {
+describe('section 10 — required tool names', () => {
   const required = [
     'mastishk_inject',
     'mastishk_update',
     'mastishk_log',
     'mastishk_status',
     'mastishk_checkpoint',
+    // v0.3 — the session protocol over MCP
+    'mastishk_session_start',
+    'mastishk_session_end',
+    'mastishk_catchup',
   ];
 
-  it('exposes exactly 5 tools', () => {
-    expect(TOOL_DEFINITIONS).toHaveLength(5);
+  it('exposes exactly the eight tools in the section 10 table', () => {
+    expect(TOOL_DEFINITIONS).toHaveLength(8);
+    expect(TOOL_DEFINITIONS.map((t) => t.name).sort()).toEqual([...required].sort());
   });
 
   for (const name of required) {
@@ -57,10 +66,10 @@ describe('section 9 — required tool names', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 9 — Description quality (agents must understand from description alone)
+// Section 10 — Description quality (agents must understand from description alone)
 // ---------------------------------------------------------------------------
 
-describe('section 9 — tool descriptions', () => {
+describe('section 10 — tool descriptions', () => {
   it('every tool has description longer than 20 characters', () => {
     for (const tool of TOOL_DEFINITIONS) {
       expect(tool.description.length).toBeGreaterThan(20);
@@ -101,10 +110,10 @@ describe('section 9 — tool descriptions', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 9 — Required parameters
+// Section 10 — Required parameters
 // ---------------------------------------------------------------------------
 
-describe('section 9 — required parameters', () => {
+describe('section 10 — required parameters', () => {
   it('mastishk_inject requires: task', () => {
     const t = TOOL_DEFINITIONS.find((t) => t.name === 'mastishk_inject')!;
     expect(t.inputSchema.required).toContain('task');
@@ -131,13 +140,108 @@ describe('section 9 — required parameters', () => {
     const t = TOOL_DEFINITIONS.find((t) => t.name === 'mastishk_checkpoint')!;
     expect(t.inputSchema.required).toHaveLength(0);
   });
+
+  it('mastishk_session_start requires: agent, task', () => {
+    const t = TOOL_DEFINITIONS.find((t) => t.name === 'mastishk_session_start')!;
+    expect(t.inputSchema.required).toContain('agent');
+    expect(t.inputSchema.required).toContain('task');
+  });
+
+  it('mastishk_session_end requires: handoff', () => {
+    const t = TOOL_DEFINITIONS.find((t) => t.name === 'mastishk_session_end')!;
+    expect(t.inputSchema.required).toContain('handoff');
+  });
+
+  it('mastishk_catchup requires: agent', () => {
+    const t = TOOL_DEFINITIONS.find((t) => t.name === 'mastishk_catchup')!;
+    expect(t.inputSchema.required).toContain('agent');
+  });
 });
 
 // ---------------------------------------------------------------------------
-// Section 9 — Tool handler functionality
+// Section 10 + 15 — the session tools
 // ---------------------------------------------------------------------------
 
-describe('section 9 — toolInject handler', () => {
+describe('section 10 — session tool descriptions', () => {
+  // Tool descriptions are protocol surface: an agent meeting them cold must
+  // learn both what the tool does and when to reach for it.
+  it('session_start tells the agent to call it first', () => {
+    const t = TOOL_DEFINITIONS.find((t) => t.name === 'mastishk_session_start')!;
+    expect(t.description.toLowerCase()).toContain('first');
+  });
+
+  it('session_end explains the cost of skipping the handoff', () => {
+    const t = TOOL_DEFINITIONS.find((t) => t.name === 'mastishk_session_end')!;
+    expect(t.description.toLowerCase()).toContain('handoff');
+  });
+
+  it('catchup describes what it diffs against', () => {
+    const t = TOOL_DEFINITIONS.find((t) => t.name === 'mastishk_catchup')!;
+    expect(t.description.toLowerCase()).toContain('last session');
+  });
+});
+
+describe('section 15 — session tool handlers', () => {
+  it('toolSessionStart registers presence and returns catchup plus context', async () => {
+    const result = await toolSessionStart({ agent: 'claude-code', task: 'ship npm' }, ctx);
+    expect(result).toContain('Mastishk catchup');
+    expect(result).toContain('## Mastishk context');
+
+    const active = await readActiveSessions(ctx.mastishkDir);
+    expect(active.map((s) => s.agent)).toContain('claude-code');
+  });
+
+  it('toolSessionStart names other active agents', async () => {
+    await toolSessionStart({ agent: 'cursor', task: 'refactor db' }, ctx);
+    const result = await toolSessionStart({ agent: 'claude-code', task: 'ship npm' }, ctx);
+    expect(result).toContain('cursor');
+    expect(result).toContain('refactor db');
+  });
+
+  it('toolCatchup returns the ordered catchup summary', async () => {
+    const result = await toolCatchup({ agent: 'claude-code' }, ctx);
+    expect(result).toContain('Mastishk catchup');
+  });
+
+  it('toolSessionEnd writes a handoff and deregisters', async () => {
+    await toolSessionStart({ agent: 'claude-code', task: 'ship npm' }, ctx);
+    const result = await toolSessionEnd(
+      { handoff: 'Done: packaging. Next: publish.' },
+      ctx
+    );
+    expect(result).toContain('Handoff written');
+
+    const active = await readActiveSessions(ctx.mastishkDir);
+    expect(active.map((s) => s.agent)).not.toContain('claude-code');
+  });
+
+  it('toolSessionEnd says so plainly when there is no session to end', async () => {
+    const result = await toolSessionEnd({ handoff: 'Nothing.' }, ctx);
+    expect(result).toContain('No active session');
+  });
+
+  it('toolSessionEnd refuses to guess between several active sessions', async () => {
+    await toolSessionStart({ agent: 'claude-code', task: 'a' }, ctx);
+    await toolSessionStart({ agent: 'cursor', task: 'b' }, ctx);
+    const result = await toolSessionEnd({ handoff: 'Done.' }, ctx);
+    expect(result).toContain('Multiple sessions');
+  });
+
+  it('toolSessionEnd ends the named session when several are active', async () => {
+    await toolSessionStart({ agent: 'claude-code', task: 'a' }, ctx);
+    await toolSessionStart({ agent: 'cursor', task: 'b' }, ctx);
+    await toolSessionEnd({ handoff: 'Done.', agent: 'cursor' }, ctx);
+
+    const active = await readActiveSessions(ctx.mastishkDir);
+    expect(active.map((s) => s.agent)).toEqual(['claude-code']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Section 10 — Tool handler functionality
+// ---------------------------------------------------------------------------
+
+describe('section 10 — toolInject handler', () => {
   it('returns string starting with ## Mastishk context', async () => {
     const result = await toolInject({ task: 'ship npm' }, ctx);
     expect(typeof result).toBe('string');
@@ -150,7 +254,7 @@ describe('section 9 — toolInject handler', () => {
   });
 });
 
-describe('section 9 — toolUpdate handler', () => {
+describe('section 10 — toolUpdate handler', () => {
   it('creates new node when id does not exist, returns string containing "Created"', async () => {
     const result = await toolUpdate({ id: 'goal-new', content: 'New goal.', layer: 'intent' }, ctx);
     expect(typeof result).toBe('string');
@@ -193,7 +297,7 @@ describe('section 9 — toolUpdate handler', () => {
   });
 });
 
-describe('section 9 — toolLog handler', () => {
+describe('section 10 — toolLog handler', () => {
   it('returns string containing issue id and message', async () => {
     const result = await toolLog({ message: 'Zod version conflict.' }, ctx);
     expect(typeof result).toBe('string');
@@ -219,7 +323,7 @@ describe('section 9 — toolLog handler', () => {
   });
 });
 
-describe('section 9 — toolStatus handler', () => {
+describe('section 10 — toolStatus handler', () => {
   it('returns string with total node count', async () => {
     const result = await toolStatus({} as Record<string, never>, ctx);
     expect(typeof result).toBe('string');
@@ -239,7 +343,7 @@ describe('section 9 — toolStatus handler', () => {
   });
 });
 
-describe('section 9 — toolCheckpoint handler', () => {
+describe('section 10 — toolCheckpoint handler', () => {
   it('throws "Git checkpoint failed" on non-git directory', async () => {
     await expect(toolCheckpoint({}, ctx)).rejects.toThrow('Git checkpoint failed');
   });

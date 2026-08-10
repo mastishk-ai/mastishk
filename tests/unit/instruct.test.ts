@@ -85,7 +85,7 @@ describe('instruct — claude-code agent', () => {
     await instructCommand({ cwd: tmpDir, agent: 'claude-code' });
     const content = await readFile(join(tmpDir, 'CLAUDE.md'), 'utf-8');
     expect(content).toContain('## Mastishk memory');
-    expect(content).toContain('mastishk inject');
+    expect(content).toContain('mastishk session start');
   });
 
   it('does not duplicate Mastishk section on second call', async () => {

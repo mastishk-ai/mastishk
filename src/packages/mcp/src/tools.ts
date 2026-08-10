@@ -6,6 +6,10 @@ import {
   readMemoryMap,
   readNode,
   commitNode,
+  sessionStart,
+  sessionEnd,
+  readActiveSessions,
+  catchup,
 } from '@mastishk/core';
 import type { MskNode, MskLayer, MskType, MemoryMapNode, CommitResult } from '@mastishk/core';
 
@@ -25,6 +29,7 @@ const DEFAULT_TYPE_FOR_LAYER: Record<string, MskType> = {
   intent: 'goal',
   state: 'task',
   knowledge: 'fact',
+  map: 'file',
   issues: 'issue',
 };
 
@@ -54,13 +59,13 @@ export async function toolInject(
 }
 
 // ---------------------------------------------------------------------------
-// mastishk_update — spec section 9
+// mastishk_update — spec section 10
 // ---------------------------------------------------------------------------
 export async function toolUpdate(
-  params: { id: string; content: string; layer: string },
+  params: { id: string; content: string; layer: string; path?: string },
   ctx: ToolContext
 ): Promise<string> {
-  const { id, content, layer } = params;
+  const { id, content, layer, path } = params;
   const map = await readMemoryMap(memMapPath(ctx));
   const existing = map.nodes[id];
 
@@ -72,6 +77,10 @@ export async function toolUpdate(
       ...node,
       body: content,
       last_updated_by: MCP_AGENT_ID,
+      // Spec 4.4 — an agent rewriting a map entry has verified it against the
+      // code, so the staleness flag clears. That is the whole refresh cycle.
+      ...(node.layer === 'map' ? { stale: false, verified: true } : {}),
+      ...(path !== undefined ? { path } : {}),
     });
     if (!result.committed) return describeRejection(result);
     return `Updated node "${id}" in ${existing.layer} layer.`;
@@ -81,6 +90,13 @@ export async function toolUpdate(
   const mskLayer = layer as MskLayer;
   const mskType = DEFAULT_TYPE_FOR_LAYER[layer] ?? 'fact';
   const now = new Date().toISOString();
+
+  // Spec 4.4 — a map node without a path cannot be staleness-tracked, so refuse
+  // it here with an actionable message rather than letting schema validation
+  // reject it with a less helpful one.
+  if (mskLayer === 'map' && !path) {
+    return 'Cannot create a map node without "path". Pass the repo-relative file or directory the entry describes.';
+  }
 
   const node: MskNode = {
     id,
@@ -96,6 +112,8 @@ export async function toolUpdate(
     dependencies: [],
     contradictions: [],
     body: content,
+    ...(path !== undefined ? { path } : {}),
+    ...(mskLayer === 'map' ? { stale: false } : {}),
   };
 
   const result = await commitNode(ctx.mastishkDir, node);
@@ -195,7 +213,84 @@ export async function toolCheckpoint(
 }
 
 // ---------------------------------------------------------------------------
-// Tool definitions (spec section 9 — descriptions MUST enable first-time use)
+// mastishk_session_start — spec sections 10 + 15.1
+// ---------------------------------------------------------------------------
+export async function toolSessionStart(
+  params: { agent: string; task: string },
+  ctx: ToolContext
+): Promise<string> {
+  const result = await sessionStart(ctx.mastishkDir, params.agent, params.task);
+
+  const sections: string[] = [];
+  if (result.presence.length > 0) {
+    // Spec 15.1 step 2 — name each active agent and its task.
+    sections.push(
+      '## Other agents active on this project\n' +
+        result.presence
+          .map((s) => `- ${s.agent} since ${s.started_at} — "${s.task}"`)
+          .join('\n')
+    );
+  }
+  sections.push(result.catchup, result.context);
+  return sections.join('\n\n');
+}
+
+// ---------------------------------------------------------------------------
+// mastishk_session_end — spec sections 10 + 15.2
+// ---------------------------------------------------------------------------
+export async function toolSessionEnd(
+  params: { handoff: string; agent?: string },
+  ctx: ToolContext
+): Promise<string> {
+  // MCP tool calls do not carry agent identity (see MCP_AGENT_ID). If the caller
+  // does not name itself and exactly one session is active, that is unambiguously
+  // the session ending; otherwise we cannot guess and say so.
+  let agent = params.agent;
+  if (!agent) {
+    const active = await readActiveSessions(ctx.mastishkDir);
+    if (active.length === 1) {
+      agent = active[0]!.agent;
+    } else if (active.length === 0) {
+      return 'No active session to end. Call mastishk_session_start first, or pass "agent".';
+    } else {
+      return (
+        `Multiple sessions are active (${active.map((s) => s.agent).join(', ')}). ` +
+        'Pass "agent" to say which one is ending.'
+      );
+    }
+  }
+
+  const result = await sessionEnd(ctx.mastishkDir, agent, { handoff: params.handoff });
+
+  const lines: string[] = [];
+  if (result.handoffId) lines.push(`Handoff written: ${result.handoffId}`);
+  if (result.warning) lines.push(`Warning: ${result.warning}`);
+
+  // Spec 15.2 step 4 — checkpoint. Degrade gracefully outside a git repo:
+  // failing to commit must not lose the handoff that was already written.
+  try {
+    await toolCheckpoint({ message: `mastishk: session end — ${agent}` }, ctx);
+    lines.push('Memory checkpointed to git.');
+  } catch (err) {
+    lines.push(`Checkpoint skipped: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  lines.push(`Session ended for ${agent}.`);
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// mastishk_catchup — spec sections 10 + 15.4
+// ---------------------------------------------------------------------------
+export async function toolCatchup(
+  params: { agent: string },
+  ctx: ToolContext
+): Promise<string> {
+  return catchup(ctx.mastishkDir, params.agent);
+}
+
+// ---------------------------------------------------------------------------
+// Tool definitions (spec section 10 — descriptions MUST enable first-time use)
 // ---------------------------------------------------------------------------
 export const TOOL_DEFINITIONS = [
   {
@@ -236,8 +331,15 @@ export const TOOL_DEFINITIONS = [
         },
         layer: {
           type: 'string',
-          enum: ['intent', 'state', 'knowledge', 'issues'],
-          description: 'Memory layer: intent (goals/constraints), state (tasks/progress), knowledge (decisions/facts), issues (bugs/blockers).',
+          enum: ['intent', 'state', 'knowledge', 'map', 'issues'],
+          description:
+            'Memory layer: intent (goals/constraints), state (tasks/progress), knowledge (decisions/facts), ' +
+            'map (which file does what), issues (bugs/blockers).',
+        },
+        path: {
+          type: 'string',
+          description:
+            'Repo-relative file or directory path. Required when layer is "map" — it is what ties the entry to the code.',
         },
       },
       required: ['id', 'content', 'layer'],
@@ -292,6 +394,75 @@ export const TOOL_DEFINITIONS = [
         },
       },
       required: [],
+    },
+  },
+  {
+    name: 'mastishk_session_start',
+    description:
+      'Check in to this project\'s shared memory. Call this FIRST, before any other tool and ' +
+      'before you start work — it is how you discover what other agents have already done. ' +
+      'Returns three things: which other agents are currently active on this project, what ' +
+      'changed in memory since your last session (the previous session\'s handoff, resolved ' +
+      'tasks, new issues, stale map entries), and the causal context for your task. Read all ' +
+      'of it before touching any code.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agent: {
+          type: 'string',
+          description: 'Your agent ID, e.g. "claude-code" or "cursor". Used to work out what is new for you.',
+        },
+        task: {
+          type: 'string',
+          description: 'Natural-language description of what you are about to work on.',
+        },
+      },
+      required: ['agent', 'task'],
+    },
+  },
+  {
+    name: 'mastishk_session_end',
+    description:
+      'Hand off to the next agent and check out. Call this when you finish working, before the ' +
+      'conversation ends — an unwritten handoff means the next agent (or the next you) starts ' +
+      'cold and repeats your work. Writes a handoff note to memory, records your session, and ' +
+      'commits memory to git. Structure the handoff around four things: what you completed, ' +
+      'what is half-finished and where, what the next session must not break, and what to pick ' +
+      'up first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        handoff: {
+          type: 'string',
+          description:
+            'The handoff note. Cover: Done / In flight / Watch out / Next. Be specific — name files and line numbers.',
+        },
+        agent: {
+          type: 'string',
+          description: 'Your agent ID. Optional when exactly one session is active.',
+        },
+      },
+      required: ['handoff'],
+    },
+  },
+  {
+    name: 'mastishk_catchup',
+    description:
+      'Summarise what changed in project memory since your last session, without starting a ' +
+      'new one. Use this when you are already checked in and want to re-orient — for example ' +
+      'after a long pause, or when another agent has been working in parallel. Returns, in ' +
+      'order: the most recent handoff, tasks resolved since you were last here, new or updated ' +
+      'issues, new knowledge, codebase map entries that have gone stale, and the next unblocked ' +
+      'plan step.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agent: {
+          type: 'string',
+          description: 'Your agent ID, e.g. "claude-code". Determines the point to diff from.',
+        },
+      },
+      required: ['agent'],
     },
   },
 ] as const;

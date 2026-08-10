@@ -1,6 +1,6 @@
-// SPEC-GAP: interactive goal prompt on init not in spec section 10 — proposed as spec section 11
-// SPEC-GAP: CLAUDE.md auto-create (when absent) not in spec section 10 — spec only says append if exists
-// SPEC-GAP: git hook installation not in spec — proposed as spec section 12
+// These three behaviours were SPEC-GAPs in v0.2 and are now specified in v0.3:
+// the interactive goal prompt (section 12.5), creating the instruction file when
+// absent (section 14.2), and post-commit hook installation (section 16.1).
 import { mkdir, writeFile, readFile, access, chmod, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@mastishk/core';
 import type { MskNode } from '@mastishk/core';
 import { mastishkDir, memoryMapPath } from '../utils.js';
+import { injectAllBriefings } from './onboarding.js';
 
 // Default agents.json per spec section 9. The reference CLI and MCP server act
 // on behalf of the human / primary agents, so they register as high trust;
@@ -31,33 +32,9 @@ const DEFAULT_AGENTS = {
   ],
 };
 
-// SPEC-GAP: richer CLAUDE.md briefing format proposed as spec section 13
-export const CLAUDE_MD_SECTION = `
-## Mastishk memory
-
-This project uses Mastishk for persistent agent memory.
-Memory lives in \`.mastishk/\` — do not edit these files manually.
-
-**At the start of every session — do this first, before anything else:**
-Run \`mastishk inject "<task>"\` and read the full output.
-It contains your goals, current state, constraints, and open issues.
-Do not start work until you have read it.
-
-**During the session:**
-- If you complete a task: update its status in \`state/\`
-- If you hit an error: log it with \`mastishk log\`
-- If you learn something about the architecture: add it to \`knowledge/\`
-
-**At the end of every session:**
-- Update \`.mastishk/state/progress.msk.md\` with what was done
-- Run \`mastishk checkpoint\` to commit memory state to git
-
-**Memory layers:**
-- \`.mastishk/intent/\` — goals and constraints. Never modify without human confirmation.
-- \`.mastishk/state/\` — current tasks and progress. Update freely.
-- \`.mastishk/knowledge/\` — architecture and decisions. Add as you learn.
-- \`.mastishk/issues/\` — errors and blockers. Always log, never delete.
-`;
+// Spec section 14.3 — the canonical briefing lives in onboarding.ts and is shared
+// by init and instruct. Re-exported here for the existing import surface.
+export { MASTISHK_SECTION as CLAUDE_MD_SECTION } from './onboarding.js';
 
 export interface InitAnswers {
   what: string;
@@ -94,21 +71,6 @@ async function writeInitNode(cwd: string, node: MskNode): Promise<void> {
   await writeMemoryMap(memoryMapPath(cwd), upsertNode(map, node.id, nodeToMapEntry(node, relFile)));
 }
 
-export async function injectClaudeMd(cwd: string): Promise<boolean> {
-  const claudeMdPath = join(cwd, 'CLAUDE.md');
-  try {
-    const existing = await readFile(claudeMdPath, 'utf-8');
-    if (!existing.includes('## Mastishk memory')) {
-      await writeFile(claudeMdPath, existing + CLAUDE_MD_SECTION, 'utf-8');
-      return true;
-    }
-    return false; // already has section
-  } catch {
-    // CLAUDE.md does not exist — create it
-    await writeFile(claudeMdPath, CLAUDE_MD_SECTION.trimStart(), 'utf-8');
-    return true;
-  }
-}
 
 export async function initCommand(options: InitOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
@@ -232,8 +194,9 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
     writtenNodes.push('progress.msk.md');
   }
 
-  // Spec section 10 + SPEC-GAP: also create CLAUDE.md if absent
-  const claudeMdUpdated = await injectClaudeMd(cwd);
+  // Spec section 14 — AGENTS.md is canonical, CLAUDE.md is its mirror
+  const briefings = await injectAllBriefings(cwd);
+  const briefingsWritten = briefings.filter((b) => b.outcome !== 'unchanged');
 
   // SPEC-GAP: git hook installation proposed as spec section 12
   let hookInstalled = false;
@@ -259,7 +222,9 @@ export async function initCommand(options: InitOptions = {}): Promise<void> {
   if (writtenNodes.includes('goals.msk.md')) console.log('✅ Wrote goals.msk.md');
   if (writtenNodes.includes('constraints.msk.md')) console.log('✅ Wrote constraints.msk.md');
   if (writtenNodes.includes('progress.msk.md')) console.log('✅ Wrote progress.msk.md');
-  if (claudeMdUpdated) console.log('✅ Updated CLAUDE.md with Mastishk briefing');
+  for (const b of briefingsWritten) {
+    console.log(`✅ ${b.outcome === 'created' ? 'Created' : 'Updated'} ${b.file} with Mastishk briefing`);
+  }
   if (hookInstalled)
     console.log('✅ Git hook installed — memory updates automatically on every commit.');
   console.log('\n🎉 Done. Open your coding agent — it already knows your project.');

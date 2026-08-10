@@ -62,3 +62,15 @@ path + stale (additive index change, old indexes still valid). Compliance 10 (ma
 Doctor's first real run found progress-phase-1 unindexed in this project's own memory — fixed.
 Only v0.3 gaps left are Phase 12: AGENTS.md as canonical onboarding (§14.2) and the three
 session MCP tools (§10). Both now carry explicit not-implemented markers in the spec.
+
+### 2026-08-10T02:00:00Z — claude-code
+
+Phase 12 COMPLETE — v0.3 fully implemented. cli/onboarding.ts (canonical §14.3 briefing +
+§14.2 rules, shared by init and instruct); init writes AGENTS.md canonical + CLAUDE.md mirror;
+instruct refreshes an existing section while preserving project content after it. MCP gained
+session_start / session_end / catchup (8 tools) and mastishk_update now accepts the map layer
+with path, clearing stale on rewrite. Compliance 12-onboarding (22) added, 06-mcp-tools
+extended to 48 and renumbered §9 → §10. 616 tests green.
+This task node is now RESOLVED: phases 9–12 are all delivered. Remaining work is research
+(Phase 13 RelayBench) and the empirical paper (Phase 14), tracked in TODO.md — not protocol
+implementation.

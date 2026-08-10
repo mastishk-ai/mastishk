@@ -1,7 +1,8 @@
 # Mastishk — What's Left
 
-> Generated 2026-08-10, last updated 2026-08-10 (phases 9, 10 + 11 closed out).
-> Baseline: 578 tests green, 31 test files, typecheck clean, core/cli/mcp all build.
+> Generated 2026-08-10, last updated 2026-08-10 (phases 9–12 closed out; **v0.3 fully
+> implemented**). Baseline: 616 tests green, 32 test files, typecheck clean, all packages build.
+> What remains is research and publication, not protocol implementation.
 > Spec: `MASTISHK-SPEC.md` v0.3 draft. Phase table: `CLAUDE.md`.
 
 ---
@@ -86,31 +87,37 @@ with compliance suites 10 and 11. 578 tests green.
 
 ---
 
-## 3. Phase 12 — onboarding + MCP + compliance
+## 3. ~~Phase 12 — onboarding + MCP + compliance~~ ✅ DONE 2026-08-10
 
-### 3.1 AGENTS.md canonical (spec §14)
-Zero references to `AGENTS.md` anywhere in `src/packages/cli/src/`. `init` writes `CLAUDE.md`
-only, so the canonical file is the one that doesn't get written.
-- [ ] `init` writes the briefing to `AGENTS.md` (canonical), mirrors into `CLAUDE.md`
-- [ ] Injection rules §14.2: append if file exists without `## Mastishk memory`; create if absent;
-      leave unchanged on `init` if already present
-- [ ] `instruct` MAY replace an existing section with the current canonical format
-- [ ] Section format per §14.3 (heading, session-start instruction, layers, end-of-session)
+**v0.3 is now fully implemented.** Every normative spec section has an implementation and
+compliance coverage. 616 tests green.
 
-### 3.2 MCP v0.3 tools (spec §10)
-Server exposes only the 5 v0.2 tools. Three are missing.
-- [ ] `mastishk_session_start` — `agent`, `task` → presence + catchup + inject
-- [ ] `mastishk_session_end` — `handoff` → handoff node, deregister, checkpoint
-- [ ] `mastishk_catchup` — `agent` → changes since that agent's last session
-- [ ] Tool descriptions are protocol surface — write them for an agent seeing them cold
-- [ ] Single-writer mode (§16.2) — serialise writes through the server
+### 3.1 AGENTS.md canonical (spec §14) ✅
+- [x] `cli/commands/onboarding.ts` holds the canonical §14.3 briefing and the §14.2 rules,
+      shared by init and instruct rather than reimplemented per command
+- [x] `init` writes `AGENTS.md` (canonical) and mirrors `CLAUDE.md`
+- [x] Injection rules: append / create / leave unchanged on init
+- [x] `instruct` replaces an existing section with the current canonical format
+- [x] Replacement **preserves project content following our section** — without this,
+      re-running instruct would silently delete a project's own rules
+
+### 3.2 MCP v0.3 tools (spec §10) ✅
+- [x] `mastishk_session_start`, `mastishk_session_end`, `mastishk_catchup`, wired into dispatch
+- [x] `session_end` infers the agent when exactly one session is active and refuses to guess
+      when several are, rather than ending the wrong one
+- [x] Descriptions written for an agent meeting them cold, with compliance tests asserting so
+- [x] **Found while working:** `mastishk_update` could not write map nodes — its layer enum
+      predated the map layer, so an agent could not refine a map entry via MCP even though
+      §4.4 says agents do exactly that. Added `map` + `path`; rewriting a map node now clears
+      its stale flag, completing the refresh cycle.
+- [ ] Single-writer mode (§16.2) — SHOULD-level, still open
 
 ### 3.3 Compliance
 - [x] `10-map-staleness.compliance.test.ts` — §4.4 + §16.1 (16 tests)
 - [x] `11-plans-doctor.compliance.test.ts` — §11 `next` / `doctor` (18 tests)
 - [x] `07-cli-commands` extended with `next` / `map` / `doctor`, renumbered §10 → §11
-- [ ] `12-onboarding.compliance.test.ts` — §14 AGENTS.md rules
-- [ ] Extend `06-mcp-tools.compliance.test.ts` to the 8-tool table
+- [x] `12-onboarding.compliance.test.ts` — §14 AGENTS.md rules (22 tests)
+- [x] `06-mcp-tools.compliance.test.ts` extended to the 8-tool table (48 tests), renumbered §9 → §10
 - [x] Spec §18 compliance list updated to match
 
 ---
@@ -192,8 +199,8 @@ FSE or ASE is arguably the better home for this work, with an EMSE extension aft
 | 9 | v0.3 core: schema, Referee, atomic writes, trust | ✅ verified vs §8.3/§17, committed 2026-08-10 |
 | 10 | v0.3 sessions: start/end, catchup, handoff, presence | ✅ verified vs §15, committed 2026-08-10 |
 | 11 | map layer, scan→map, staleness, plans, `next`, `doctor` | ✅ verified vs §4.4/§11/§16.1, committed 2026-08-10 |
-| 12 | AGENTS.md canonical, MCP v0.3 tools, compliance §14/§16 | ⬜ **next up** — the only v0.3 gaps left |
-| 13 | RelayBench E0 → full harness | ⬜ not started |
+| 12 | AGENTS.md canonical, MCP v0.3 tools, compliance §14/§10 | ✅ committed 2026-08-10 |
+| 13 | RelayBench E0 → full harness | ⬜ **next up** — the gate on everything downstream |
 | 14 | Empirical paper rewrite | ⬜ blocked on 13 |
 
 **Also still open from Phase 7 (human actions):** npm publish (`@mastishk/core`, `@mastishk/cli`,

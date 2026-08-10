@@ -20,6 +20,32 @@ Phase 5 — @mastishk/cli: scan command — COMPLETE.
 Phase 6 — tests/compliance/: full compliance suite — COMPLETE.
 Phase 7 — npm publish prep + arXiv paper + mastishk.dev — COMPLETE (human publish actions pending).
 
+### 2026-08-10T02:00:00Z — claude-code
+
+Phase 12 COMPLETE — **v0.3 is now fully implemented.** Every normative spec section has an
+implementation and compliance coverage; the only recorded deviation is the §15.4 catchup source.
+Delivered in @mastishk/cli: onboarding.ts — the canonical §14.3 briefing plus the §14.2
+injection rules (create / append / leave alone / replace) shared by init and instruct. init now
+writes AGENTS.md (canonical) and mirrors CLAUDE.md; instruct re-runs with replace:true so a
+stale briefing gets refreshed. Replacement preserves project content following our section —
+without that, re-running instruct would silently delete a project's own rules.
+In @mastishk/mcp: mastishk_session_start / session_end / catchup, wired into the server
+dispatch (8 tools total). session_end infers the agent when exactly one session is active and
+refuses to guess when several are — it does not silently end the wrong one.
+Also found and fixed: mastishk_update could not write map nodes (its layer enum predated the
+map layer), so an agent could not refine a map entry via MCP even though §4.4 says agents do
+exactly that. Added map + path; rewriting a map node now clears its stale flag, which is the
+refresh cycle §4.4 describes.
+616 tests green (32 files; new compliance 12-onboarding with 22 tests, 06-mcp-tools extended to
+48), typecheck clean, core/cli/mcp build.
+v0.2 behaviour changed deliberately (recorded in the spec changelog): the briefing now tells
+agents to run `mastishk session start`, not `mastishk inject`. Five existing tests asserted the
+old text and were updated in the same commit per the sequencing rule.
+Cleared the last not-implemented markers from spec §10 and §14.2, and the last 🚧 from README
+and CLAUDE.md. The implementation-status banner now says v0.3 is fully covered.
+Next: Phase 13 — RelayBench. Start with the E0 exploration-token pilot on one repo before
+building the full harness. Nothing publishable exists until Phase 13 produces results.
+
 ### 2026-08-10T01:00:00Z — claude-code
 
 Phase 11 COMPLETE — v0.3 codebase map + plan nodes.

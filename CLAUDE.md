@@ -98,23 +98,24 @@ Supporting mechanisms (spec/METHODOLOGY claims 1–9): three semantic layers, DA
 
 ```bash
 npx @mastishk/cli init               # scaffold .mastishk/ in a project
-npx @mastishk/cli session start ...  # check in: presence + catchup + inject (v0.3, 🚧)
-npx @mastishk/cli session end        # hand off + checkpoint (v0.3, 🚧)
-npx @mastishk/cli catchup            # what changed since my last session (v0.3, 🚧)
-npx @mastishk/cli next               # first unblocked plan step (v0.3, 🚧)
+npx @mastishk/cli session start ...  # check in: presence + catchup + inject
+npx @mastishk/cli session end        # hand off + checkpoint
+npx @mastishk/cli catchup            # what changed since my last session
+npx @mastishk/cli next               # first unblocked plan step
 npx @mastishk/cli inject "task"      # get causal context for a task
 npx @mastishk/cli update <id>        # update a memory node
 npx @mastishk/cli log                # append to issues
-npx @mastishk/cli map [--stale]      # codebase map inspection (v0.3, 🚧)
+npx @mastishk/cli map [--stale]      # codebase map inspection
 npx @mastishk/cli scan               # infer memory from existing project
 npx @mastishk/cli status             # show memory health
-npx @mastishk/cli doctor             # lint the whole memory folder (v0.3, 🚧)
+npx @mastishk/cli doctor             # lint the whole memory folder
 npx @mastishk/cli checkpoint         # git commit the memory folder
 npx @mastishk/cli mcp                # start MCP server
 npx @mastishk/cli instruct --agent … # onboard an agent (AGENTS.md canonical)
 ```
 
-🚧 = specified in v0.3, not yet implemented. Implement only alongside its compliance tests.
+All commands above are implemented and covered by `tests/compliance/`. Mark anything newly
+specified but unbuilt with 🚧, and implement it only alongside its compliance tests.
 
 ---
 
@@ -148,7 +149,7 @@ npx @mastishk/cli instruct --agent … # onboard an agent (AGENTS.md canonical)
 | 9 | v0.3 core: schema v0.3 (new types/layers/fields), deterministic Referee, atomic writes + lock, trust enforcement, `commitNode` canonical write path | ✅ 2026-06-12 |
 | 10 | v0.3 sessions: session start/end, catchup, handoff nodes, presence registry | ✅ 2026-08-10 |
 | 11 | v0.3 map + plans: map layer, scan-generated map nodes, hook staleness flagging, plan nodes + `next`, `doctor` | ✅ 2026-08-10 |
-| 12 | v0.3 onboarding + compliance: AGENTS.md canonical instruct/init, new MCP tools, compliance suite for §15–§17 | ⬜ |
+| 12 | v0.3 onboarding + compliance: AGENTS.md canonical instruct/init, new MCP tools, compliance suite for §14 + §10 | ✅ 2026-08-10 — **v0.3 fully implemented** |
 | 13 | RelayBench: E0 exploration-token pilot, then harness per docs/RESEARCH.md | ⬜ |
 | 14 | Empirical paper rewrite of docs/paper.tex (after Phase 13 results) | ⬜ |
 
@@ -160,10 +161,29 @@ Update this table at the end of every session.
 
 ## Mastishk memory
 
-This project uses [Mastishk](https://mastishk.dev) for persistent shared agent memory.
+This project uses Mastishk for persistent shared agent memory.
+Memory lives in `.mastishk/` — do not edit these files manually.
+Multiple agents work on this project. Mastishk is the single brain they share.
 
-- Memory folder: `.mastishk/`
-- Get context: `npx mastishk inject "<your task>"`
-- Log an issue: `npx mastishk log "description"`
-- Check health: `npx mastishk status`
-- (v0.3, once implemented: `mastishk session start` / `session end` / `catchup`)
+**At the start of every session — do this first, before anything else:**
+Run `mastishk session start --agent <your-agent-id> --task "<task>"`.
+Read the full output: it contains the handoff from the previous session,
+what changed since you were last here, goals, current state, constraints,
+the codebase map, and open issues. Do not start work until you have read it.
+
+**During the session:**
+- If you complete a task: update its status in `state/`
+- If you hit an error: log it with `mastishk log`
+- If you learn something about the architecture: add it to `knowledge/`
+- If a `map/` entry you rely on is marked (stale): verify it against the code and refresh it
+
+**At the end of every session:**
+Run `mastishk session end` and write a handoff covering:
+Done / In flight / Watch out / Next.
+
+**Memory layers:**
+- `.mastishk/intent/` — goals, constraints, resources. Never modify without human confirmation.
+- `.mastishk/state/` — tasks, plans, progress, handoffs. Update freely (append-only).
+- `.mastishk/knowledge/` — architecture and decisions. Add as you learn.
+- `.mastishk/map/` — which file does what. Keep fresh; trust is everything here.
+- `.mastishk/issues/` — errors and blockers. Always log, never delete.

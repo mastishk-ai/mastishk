@@ -10,11 +10,10 @@ mastishk init
 mastishk session start --agent claude-code --task "build JWT authentication"
 ```
 
-> **Status:** protocol spec v0.3 (draft). The reference implementation covers spec v0.2
-> plus the v0.3 session protocol (sessions, catchup, handoff), write path (Referee, trust,
-> atomic writes), and codebase map (map nodes, staleness contract, `next`, `doctor`).
-> Still unbuilt — marked 🚧 below — are `AGENTS.md` as the canonical onboarding file and
-> the three session MCP tools; tracked in the [build phases](CLAUDE.md). npm publish pending.
+> **Status:** protocol spec v0.3 (draft). **The reference implementation covers all of
+> v0.3** — session protocol, write path with the Referee, codebase map with its staleness
+> contract, AGENTS.md onboarding, and all eight MCP tools — with a compliance suite for
+> each. See the [build phases](CLAUDE.md) for what is next. npm publish pending.
 
 ---
 
@@ -80,11 +79,10 @@ When an agent needs context, `mastishk inject "your task"` matches entry nodes, 
 npm install -g @mastishk/cli
 cd your-project
 mastishk init        # scaffolds .mastishk/, prompts for goals/resources,
-                     # installs git hook, writes CLAUDE.md briefing
-                     # (AGENTS.md as canonical target 🚧)
+                     # installs git hook, writes AGENTS.md + CLAUDE.md briefing
 
 # Connect agents (each one reads the same brain)
-mastishk instruct --agent claude-code   # CLAUDE.md briefing (AGENTS.md 🚧)
+mastishk instruct --agent claude-code   # AGENTS.md + CLAUDE.md briefing
 mastishk instruct --agent cursor        # .cursor/mcp.json — restart Cursor
 mastishk instruct --agent windsurf      # .windsurf/mcp.json — restart Windsurf
 mastishk instruct --agent api           # stdout — pipe into any custom agent
@@ -105,7 +103,7 @@ After `mastishk init`, every `feat:`/`fix:`/`wip:` commit updates state memory a
 
 ## Connecting agents
 
-Any agent that opens the project discovers Mastishk through `CLAUDE.md`. (Spec §14 makes `AGENTS.md` — the ecosystem-standard agent instruction file — the canonical location, with `CLAUDE.md` as its mirror; that switch is 🚧.) For MCP-capable agents:
+Any agent that opens the project discovers Mastishk through `AGENTS.md` (the ecosystem-standard agent instruction file; `CLAUDE.md` gets a mirror for Claude Code). For MCP-capable agents:
 
 ```bash
 npm install -g @mastishk/mcp
@@ -123,7 +121,7 @@ npm install -g @mastishk/mcp
 }
 ```
 
-Tools exposed: `mastishk_inject`, `mastishk_update`, `mastishk_log`, `mastishk_status`, `mastishk_checkpoint`, plus `mastishk_session_start`, `mastishk_session_end`, `mastishk_catchup` 🚧.
+Eight tools exposed: `mastishk_session_start`, `mastishk_session_end`, `mastishk_catchup`, `mastishk_inject`, `mastishk_update`, `mastishk_log`, `mastishk_status`, `mastishk_checkpoint`.
 
 ---
 
