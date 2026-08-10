@@ -1,74 +1,138 @@
 # @mastishk/cli
 
-CLI for the [Mastishk protocol](https://mastishk.dev) — add persistent structured memory to any project.
+CLI for the [Mastishk protocol](https://mastishk.dev) — persistent, **shared** memory for AI coding agents.
+
+The `.mastishk/` folder belongs to your repository, not to any one agent. Claude Code, Cursor,
+and custom API agents all check into the same brain through a session protocol:
+**check in → catch up → work → hand off.**
+
+Implements protocol spec **v0.3**.
 
 ## Install
 
 ```bash
 npm install -g @mastishk/cli
-# or use with npx
+# or
 npx @mastishk/cli init
 ```
 
 ## Quick start
 
 ```bash
-# 1. Add Mastishk memory to your project
-npx mastishk init
+cd your-project
+mastishk init                    # scaffold .mastishk/, write AGENTS.md, install git hook
+mastishk scan                    # infer memory from package.json, git log, README, source files
 
-# 2. Get memory context for your current task
-npx mastishk inject "build JWT authentication"
+# every session, first thing
+mastishk session start --agent claude-code --task "add refresh token rotation"
 
-# 3. Log an issue or error
-npx mastishk log "Zod version conflict with existing deps"
+# ... work ...
 
-# 4. Check memory health
-npx mastishk status
-
-# 5. Commit memory state to git
-npx mastishk checkpoint
+mastishk session end             # write a handoff, checkpoint memory to git
 ```
+
+When a different agent opens the project tomorrow, `mastishk session start` hands it the
+previous session's handoff, what changed since it was last here, and the causal context for
+its task — plus a warning about any codebase-map entry that has gone stale.
 
 ## Commands
 
-### `mastishk init [--template <name>]`
-Scaffold `.mastishk/` folder structure, create `memory-map.json` and `agents.json`, and append a Mastishk section to `CLAUDE.md` if present.
+### Session protocol
 
-### `mastishk inject <task>`
-Get structured memory context for a task. Output is a formatted string ready for use in an agent system prompt — DAG traversal from matched nodes, not keyword search.
+#### `mastishk session start --agent <id> [--task <task>]`
+Check in. Registers presence, warns about other active agents, then prints your catchup and
+the injected context for the task. Read all of it before starting work.
 
-### `mastishk update <id> [--status <status>] [--confidence <float>]`
-Update the status or confidence of an existing memory node.
+#### `mastishk session end [--agent <id>] [--handoff <text>]`
+Hand off. Writes a handoff node covering Done / In flight / Watch out / Next, records your
+session, and checkpoints memory to git. Prompts for the four sections when run interactively.
 
-### `mastishk log [--error] <message>`
-Append an issue or error to `.mastishk/issues/`. Creates a new `issue-{timestamp}.msk.md` node.
+#### `mastishk catchup [--agent <id>]`
+What changed since your last session: the most recent handoff, tasks resolved, new issues,
+new knowledge, stale map entries, and the next unblocked plan step.
 
-### `mastishk scan`
-Infer memory from the existing project — reads `package.json`, `git log`, and `README.md` to create starter knowledge and state nodes.
+### Working with memory
 
-### `mastishk status`
-Show memory health: node count by layer and status, open issues, stale nodes.
+#### `mastishk inject <task>`
+Structured context for a task. Matched entry nodes, then **DAG traversal** — so a task brings
+along the goal it serves and the constraints that bind it. Similarity finds the door;
+causality walks the house.
 
-### `mastishk checkpoint [--message <msg>]`
-Git commit the current `.mastishk/` state as a memory checkpoint.
+#### `mastishk next`
+The first unblocked step of the most recently updated active plan.
 
-### `mastishk mcp`
-Start the MCP server (see `@mastishk/mcp`).
+#### `mastishk map [--stale] [--refresh <id>]`
+Inspect the codebase map — which file does what. `--stale` lists entries whose files changed
+since the entry was written; `--refresh` clears the flag once you have verified one.
+
+#### `mastishk update <id> [--status <status>] [--confidence <float>]`
+Update a node's status or confidence.
+
+#### `mastishk log [--error] <message>`
+Append an issue, error, or blocker to `.mastishk/issues/`.
+
+### Health and maintenance
+
+#### `mastishk status`
+Memory health: node counts by layer and status, open issues, expired nodes.
+
+#### `mastishk doctor`
+Lint the whole memory folder — schema, layer/type pairing, graph constraints, ID uniqueness,
+index drift, expired nodes, stale map entries, long-running sessions. Exits non-zero on any
+spec violation, so it works in CI.
+
+#### `mastishk scan`
+Infer starter memory from an existing project: `package.json`, `git log`, `README.md`, and a
+walk of your source files to seed the codebase map.
+
+#### `mastishk checkpoint [--message <msg>]`
+Git commit the current `.mastishk/` state.
+
+### Setup
+
+#### `mastishk init [--template <name>]`
+Scaffold `.mastishk/`, create `memory-map.json` and `agents.json`, write the agent briefing
+into `AGENTS.md` (canonical) and `CLAUDE.md` (mirror), and install a post-commit hook.
+
+#### `mastishk instruct --agent <claude-code|cursor|windsurf|api>`
+Onboard an agent. Writes `AGENTS.md` + `CLAUDE.md` for Claude Code, or the MCP config for
+Cursor and Windsurf. Re-run it to refresh an out-of-date briefing.
+
+#### `mastishk mcp`
+Start the MCP server (see [`@mastishk/mcp`](https://www.npmjs.com/package/@mastishk/mcp)).
+
+#### `mastishk hook`
+Run by the post-commit hook. Appends commit activity to state memory and flags codebase-map
+entries whose files the commit touched.
 
 ## Memory structure
 
 ```
 .mastishk/
-  intent/         ← long-term goals and constraints
-  state/          ← current tasks, progress, blockers
-  knowledge/      ← architecture decisions, tech stack
-  issues/         ← errors, bugs, blockers
-  agents.json     ← registered agents and conflict strategy
-  memory-map.json ← DAG index
+  intent/         ← goals, constraints, resources (rarely changes)
+  state/          ← tasks, plans, progress, handoffs (append-only)
+  knowledge/      ← decisions, architecture, facts
+  map/            ← which file does what, with a staleness contract
+  issues/         ← errors and blockers (never deleted, only resolved)
+  sessions/       ← who is active right now (ephemeral, gitignored)
+  agents.json     ← registered agents, trust levels, conflict strategy
+  memory-map.json ← the dependency graph index
 ```
+
+Every node is a `.msk.md` file — markdown with YAML frontmatter. Human-readable,
+git-versionable, no database, no vendor lock-in.
+
+## Ambient capture
+
+After `mastishk init`, every `feat:`/`fix:`/`wip:` commit appends to state memory
+automatically, and any commit touching a mapped file flags that map entry stale. A stale map
+entry is worse than no entry, so stale entries are visibly marked everywhere they surface.
 
 ## Protocol
 
-- Spec: [MASTISHK-SPEC.md](https://github.com/mastishk-ai/mastishk/blob/main/MASTISHK-SPEC.md)
+Mastishk is a protocol, not just a tool. Any implementation in any language that passes the
+compliance suite is Mastishk-compliant.
+
+- Spec: [MASTISHK-SPEC.md](https://github.com/mastishk-ai/mastishk/blob/master/MASTISHK-SPEC.md)
 - Website: [mastishk.dev](https://mastishk.dev)
 - License: Apache 2.0

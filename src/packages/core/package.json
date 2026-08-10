@@ -1,9 +1,9 @@
 {
   "name": "@mastishk/core",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Core schema, validation, read, write, graph, and inject for the Mastishk protocol.",
   "license": "Apache-2.0",
-  "author": "Mastishk Protocol Contributors",
+  "author": "Karan Sharma <karansharma1732@gmail.com>",
   "homepage": "https://mastishk.dev",
   "repository": {
     "type": "git",
@@ -14,8 +14,17 @@
     "url": "https://github.com/mastishk-ai/mastishk/issues"
   },
   "keywords": [
-    "ai", "agent", "memory", "mcp", "claude", "cursor", "llm",
-    "markdown", "dag", "protocol", "mastishk"
+    "ai",
+    "agent",
+    "memory",
+    "mcp",
+    "claude",
+    "cursor",
+    "llm",
+    "markdown",
+    "dag",
+    "protocol",
+    "mastishk"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -32,7 +41,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",

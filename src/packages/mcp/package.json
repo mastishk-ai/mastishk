@@ -1,9 +1,9 @@
 {
   "name": "@mastishk/mcp",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "MCP server exposing Mastishk memory tools to Claude, Cursor, and Windsurf.",
   "license": "Apache-2.0",
-  "author": "Mastishk Protocol Contributors",
+  "author": "Karan Sharma <karansharma1732@gmail.com>",
   "homepage": "https://mastishk.dev",
   "repository": {
     "type": "git",
@@ -14,8 +14,16 @@
     "url": "https://github.com/mastishk-ai/mastishk/issues"
   },
   "keywords": [
-    "ai", "agent", "memory", "mcp", "claude", "cursor", "windsurf", "llm",
-    "model-context-protocol", "mastishk"
+    "ai",
+    "agent",
+    "memory",
+    "mcp",
+    "claude",
+    "cursor",
+    "windsurf",
+    "llm",
+    "model-context-protocol",
+    "mastishk"
   ],
   "type": "module",
   "bin": {
@@ -35,10 +43,11 @@
   ],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mastishk/core": "0.1.0",
+    "@mastishk/core": "0.3.0",
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "engines": {

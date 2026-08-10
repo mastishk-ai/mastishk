@@ -122,6 +122,53 @@ compliance coverage. 616 tests green.
 
 ---
 
+## 3b. npm 0.3.0 release — prepared 2026-08-10, needs your `npm login`
+
+Everything is staged. This machine has no npm auth, so the publish itself is yours to run.
+
+```bash
+npm login                      # as karansharma1732
+cd src/packages/core && npm publish --access public
+cd ../cli  && npm publish --access public
+cd ../mcp  && npm publish --access public
+```
+
+**Order matters.** `cli` and `mcp` pin `"@mastishk/core": "0.3.0"` exactly, so core must be on
+the registry first or their installs fail to resolve.
+
+- [x] Versions 0.1.0 → 0.3.0 (matches the protocol version they implement)
+- [x] Cross-package pins bumped in lockstep — at 0.1.0 they'd have pulled the *old* core
+- [x] Author set to Karan Sharma
+- [x] All three package READMEs rewritten for v0.3 (they are the npm landing pages, and were
+      documenting 8 CLI commands and 5 MCP tools)
+- [x] `prepublishOnly: npm run build` added to all three — see the root cause below
+- [x] Verified by packing, installing the tarballs into a clean project, and running the
+      packed binary end to end (15 commands, correct core resolution, init/scan/map/doctor)
+- [ ] **`npm login` + publish** ← you
+- [ ] After publishing, re-run the demo repo test and confirm the post-commit hook works
+      without the local-path workaround
+
+### The shipped bug this uncovered
+
+`mastishk init` writes a post-commit hook calling `npx @mastishk/cli hook`. The published 0.1.0
+has **no `hook` command** — its tarball contains only seven command files. It was packed from a
+stale `dist/`, hours after Phase 3b added `hook` and `instruct`. So since May, every npm user's
+post-commit hook has failed silently: no state appended, no map entries flagged stale. Ambient
+capture, a headline mechanism, has done nothing in the wild.
+
+Publishing 0.3.0 fixes it. `prepublishOnly` stops it recurring. Logged as
+`issue-stale-npm-hook`.
+
+Two follow-ups worth doing:
+- [ ] Local dev still resolves the hook through npx to the registry, so a developer working on
+      the CLI tests the *published* build, not their working tree. Consider a path-based hook
+      when `init` detects a local dev install.
+- [ ] Add a test that runs the *installed* binary, so the next packaging regression is caught
+      by CI instead of by hand. Every existing test calls the functions directly and would have
+      passed throughout this bug's entire life.
+
+---
+
 ## 4. Phase 13 — RelayBench (the phase that unlocks publication)
 
 Per `docs/RESEARCH.md`. **Nothing here exists yet, and nothing publishable exists until it does.**

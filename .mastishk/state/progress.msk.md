@@ -20,6 +20,29 @@ Phase 5 — @mastishk/cli: scan command — COMPLETE.
 Phase 6 — tests/compliance/: full compliance suite — COMPLETE.
 Phase 7 — npm publish prep + arXiv paper + mastishk.dev — COMPLETE (human publish actions pending).
 
+### 2026-08-10T03:00:00Z — claude-code
+
+npm 0.3.0 release prepared (not yet published — this machine has no npm auth).
+Bumped core/cli/mcp 0.1.0 → 0.3.0, matching the protocol version they implement, and updated
+the exact cross-package pins (`"@mastishk/core": "0.3.0"`) — leaving those at 0.1.0 would have
+shipped a cli@0.3.0 that pulls the OLD core. Author set to Karan Sharma. Rewrote all three
+package READMEs, which were v0.2-era and are the npm landing pages: the CLI one documented 8
+commands and omitted session/catchup/next/map/doctor; the MCP one listed 5 tools instead of 8.
+Verified by packing all three, installing the tarballs into a clean project, and running the
+packed binary: 15 commands present, core@0.3.0 resolved from the pin, init/scan/map/doctor all
+work. 621 tests green.
+Found a shipped bug while testing the CLI in a throwaway repo — see issue-stale-npm-hook.
+The published 0.1.0 lacks `hook` and `instruct` because it was packed from a stale `dist/`,
+so ambient capture has silently done nothing for every npm user since May. Added
+`prepublishOnly: npm run build` to all three packages so a publish can never ship a stale
+build again. Publishing 0.3.0 fixes the user-facing half.
+Also corrected the record: CLAUDE.md and this file said npm publish was a pending human
+action. It was not — task-phase-7-publish had it right all along. The Mastishk memory node was
+accurate and the hand-maintained markdown tracker was the thing that drifted, which is a
+tidy argument for the project's own thesis.
+HUMAN ACTION: `npm login`, then publish core → cli → mcp in that order (cli and mcp pin
+core@0.3.0 exactly, so core must exist on the registry first).
+
 ### 2026-08-10T02:00:00Z — claude-code
 
 Phase 12 COMPLETE — **v0.3 is now fully implemented.** Every normative spec section has an

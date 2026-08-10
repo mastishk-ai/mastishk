@@ -1,6 +1,6 @@
 {
   "version": "0.1",
-  "updated_at": "2026-08-09T19:17:25.867Z",
+  "updated_at": "2026-08-10T14:22:03.907Z",
   "nodes": {
     "decision-v03-shared-memory-redesign": {
       "file": "knowledge/decision-v03-shared-memory-redesign.msk.md",
@@ -144,6 +144,37 @@
         "complete",
         "init"
       ]
+    },
+    "issue-stale-npm-hook": {
+      "file": "issues/issue-stale-npm-hook.msk.md",
+      "layer": "issues",
+      "type": "issue",
+      "status": "active",
+      "confidence": 1,
+      "dependencies": [
+        "task-phase-7-publish"
+      ],
+      "tags": [
+        "npm",
+        "publish",
+        "hook",
+        "ambient-capture",
+        "shipped-bug"
+      ],
+      "keywords": [
+        "ambient",
+        "capture",
+        "broken",
+        "user",
+        "installs",
+        "today",
+        "mastishk",
+        "init",
+        "writes",
+        "post",
+        "commit",
+        "hook"
+      ]
     }
   },
   "edges": [
@@ -170,6 +201,11 @@
     {
       "from": "task-phase-7-publish",
       "to": "goal-mastishk-launch",
+      "relation": "depends-on"
+    },
+    {
+      "from": "issue-stale-npm-hook",
+      "to": "task-phase-7-publish",
       "relation": "depends-on"
     }
   ]

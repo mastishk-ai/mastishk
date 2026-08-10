@@ -144,7 +144,7 @@ specified but unbuilt with 🚧, and implement it only alongside its compliance 
 | 4 | `@mastishk/mcp` — MCP server with all tools | ✅ |
 | 5 | `@mastishk/cli` — scan command | ✅ |
 | 6 | `tests/compliance/` — full compliance suite (v0.2) | ✅ |
-| 7 | npm publish + arXiv (defensive pub) + mastishk.dev | ✅ (code ready — human publish pending) |
+| 7 | npm publish + arXiv (defensive pub) + mastishk.dev | ✅ npm published 0.1.0 2026-05-12; 0.3.0 prepared 2026-08-10 (needs `npm login`). arXiv + DNS still pending. |
 | 8 | Spec v0.3 + README/METHODOLOGY/RESEARCH restructure (shared-memory protocol) | ✅ 2026-06-12 |
 | 9 | v0.3 core: schema v0.3 (new types/layers/fields), deterministic Referee, atomic writes + lock, trust enforcement, `commitNode` canonical write path | ✅ 2026-06-12 |
 | 10 | v0.3 sessions: session start/end, catchup, handoff nodes, presence registry | ✅ 2026-08-10 |

@@ -1,9 +1,9 @@
 {
   "name": "@mastishk/cli",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "CLI for the Mastishk protocol — persistent structured memory for AI coding agents.",
   "license": "Apache-2.0",
-  "author": "Mastishk Protocol Contributors",
+  "author": "Karan Sharma <karansharma1732@gmail.com>",
   "homepage": "https://mastishk.dev",
   "repository": {
     "type": "git",
@@ -14,8 +14,16 @@
     "url": "https://github.com/mastishk-ai/mastishk/issues"
   },
   "keywords": [
-    "ai", "agent", "memory", "cli", "claude", "cursor", "llm",
-    "markdown", "protocol", "mastishk"
+    "ai",
+    "agent",
+    "memory",
+    "cli",
+    "claude",
+    "cursor",
+    "llm",
+    "markdown",
+    "protocol",
+    "mastishk"
   ],
   "type": "module",
   "bin": {
@@ -28,10 +36,11 @@
   ],
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mastishk/core": "0.1.0",
+    "@mastishk/core": "0.3.0",
     "@inquirer/prompts": "^7.0.0",
     "commander": "^12.1.0"
   },
